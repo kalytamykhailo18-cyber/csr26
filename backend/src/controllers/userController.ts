@@ -280,6 +280,11 @@ export const exportUsersCSV = async (
   next: NextFunction
 ): Promise<void> => {
   try {
+    console.log('[CSV EXPORT] Starting export...');
+    console.log('[CSV EXPORT] Query params:', req.query);
+    console.log('[CSV EXPORT] User:', req.user?.email);
+    console.log('[CSV EXPORT] Auth token present:', !!req.token);
+
     const { status, startDate, endDate } = req.query;
 
     // Build where clause
@@ -308,6 +313,8 @@ export const exportUsersCSV = async (
       },
       orderBy: { createdAt: 'desc' },
     });
+
+    console.log('[CSV EXPORT] Found users:', users.length);
 
     // Build CSV
     const headers = [
@@ -355,8 +362,10 @@ export const exportUsersCSV = async (
 
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', `attachment; filename=csr26-users-${new Date().toISOString().split('T')[0]}.csv`);
+    console.log('[CSV EXPORT] Sending CSV with', csvContent.length, 'characters');
     res.send(csvContent);
   } catch (error) {
+    console.error('[CSV EXPORT] Error:', error);
     next(error);
   }
 };

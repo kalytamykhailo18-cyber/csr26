@@ -216,6 +216,13 @@ export const userApi = {
     if (params?.status) queryParams.append('status', params.status);
     if (params?.startDate) queryParams.append('startDate', params.startDate);
     if (params?.endDate) queryParams.append('endDate', params.endDate);
+
+    // Add auth token to query params for window.open() download
+    const token = localStorage.getItem(TOKEN_KEY);
+    if (token) {
+      queryParams.append('token', token);
+    }
+
     const queryString = queryParams.toString();
     return `${API_BASE_URL}/users/export/csv${queryString ? `?${queryString}` : ''}`;
   },

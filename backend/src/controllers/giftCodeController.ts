@@ -138,11 +138,21 @@ export const batchUpload = asyncHandler(async (req: Request, res: Response, _nex
     data: newCodes.map((code) => ({ code, skuCode })),
   });
 
-  const response: ApiResponse<{ created: number; skipped: number }> = {
+  // Fetch the newly created codes to return them
+  const createdGiftCodes = await prisma.giftCode.findMany({
+    where: { code: { in: newCodes } },
+    include: {
+      sku: {
+        select: { code: true, name: true, price: true },
+      },
+    },
+  });
+
+  const response: ApiResponse<{ count: number; codes: typeof createdGiftCodes }> = {
     success: true,
     data: {
-      created: newCodes.length,
-      skipped: codes.length - newCodes.length,
+      count: newCodes.length,
+      codes: createdGiftCodes,
     },
   };
 

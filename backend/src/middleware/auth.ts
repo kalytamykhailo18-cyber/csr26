@@ -47,17 +47,33 @@ export const authenticate = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    // Get token from header
+    console.log('[AUTH] Authenticating request to:', req.method, req.path);
+    console.log('[AUTH] Has Authorization header:', !!req.headers.authorization);
+    console.log('[AUTH] Has token in query:', !!req.query.token);
+
+    // Get token from header or query parameter (for CSV exports with window.open)
+    let token: string | undefined;
+
     const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.substring(7);
+      console.log('[AUTH] Token from header:', token?.substring(0, 20) + '...');
+    } else if (req.query.token && typeof req.query.token === 'string') {
+      // Allow token from query parameter for CSV export downloads
+      token = req.query.token;
+      console.log('[AUTH] Token from query:', token?.substring(0, 20) + '...');
+    }
+
+    if (!token) {
+      console.log('[AUTH] No token provided');
       throw unauthorized('No token provided');
     }
 
-    const token = authHeader.substring(7);
     req.token = token;
 
     // Verify token
     const payload = verifyToken(token);
+    console.log('[AUTH] Token verified for user:', payload.email);
 
     // Get user from database
     const user = await prisma.user.findUnique({
@@ -65,12 +81,15 @@ export const authenticate = async (
     });
 
     if (!user) {
+      console.log('[AUTH] User not found:', payload.userId);
       throw unauthorized('User not found');
     }
 
+    console.log('[AUTH] Authentication successful for:', user.email);
     req.user = user;
     next();
   } catch (error) {
+    console.error('[AUTH] Authentication failed:', error);
     if (error instanceof jwt.JsonWebTokenError) {
       next(unauthorized('Invalid token'));
     } else if (error instanceof jwt.TokenExpiredError) {
