@@ -1,0 +1,275 @@
+// CSR26 Platform - Prisma Schema
+// This schema defines all database models for the MVP
+
+generator client {
+  provider   = "prisma-client-js"
+  engineType = "library"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============================================
+// ENUMS
+// ============================================
+
+enum UserStatus {
+  ACCUMULATION  // Below €10 threshold
+  CERTIFIED     // At or above €10 threshold
+}
+
+enum PaymentMode {
+  CLAIM       // Cases A, B - Merchant prepaid or funded
+  PAY         // Case C - Customer pays
+  GIFT_CARD   // Case D - Physical gift card
+  ALLOCATION  // Case E - E-commerce post-checkout
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}
+
+enum GiftCodeStatus {
+  UNUSED
+  USED
+  DEACTIVATED
+}
+
+enum UserRole {
+  USER
+  MERCHANT
+  ADMIN
+}
+
+// ============================================
+// MODELS
+// ============================================
+
+// User - Customers who interact with landing page
+model User {
+  id              String      @id @default(uuid())
+  email           String      @unique
+  firstName       String?
+  lastName        String?
+  dateOfBirth     DateTime?
+  street          String?
+  city            String?
+  postalCode      String?
+  country         String?
+  state           String?
+  role            UserRole    @default(USER)
+
+  // Wallet data
+  walletBalance   Decimal     @default(0) @db.Decimal(10, 2)
+  walletImpactKg  Decimal     @default(0) @db.Decimal(10, 4)
+  status          UserStatus  @default(ACCUMULATION)
+
+  // Corsair Connect integration
+  corsairExported Boolean     @default(false)
+  corsairId       String?
+
+  // Timestamps
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  // Relations
+  transactions    Transaction[]
+  magicLinks      MagicLink[]
+
+  @@index([email])
+  @@index([status])
+}
+
+// Transaction - Every customer interaction/payment
+model Transaction {
+  id              String        @id @default(uuid())
+  userId          String
+  skuCode         String?
+
+  // Financial data
+  amount          Decimal       @db.Decimal(10, 2)
+  impactKg        Decimal       @db.Decimal(10, 4)
+
+  // Payment info
+  paymentMode     PaymentMode
+  paymentStatus   PaymentStatus @default(PENDING)
+  stripePaymentId String?
+
+  // Attribution (3-level: Master → Partner → Merchant)
+  masterId        String        @default("CSR26")
+  partnerId       String?
+  merchantId      String?
+
+  // Gift card specific
+  giftCodeUsed    String?
+
+  // Weight-based product info (for dynamic weight calculation)
+  weightGrams     Int?
+  multiplier      Int?
+
+  // Timestamps
+  createdAt       DateTime      @default(now())
+
+  // Relations
+  user            User          @relation(fields: [userId], references: [id])
+  sku             Sku?          @relation(fields: [skuCode], references: [code])
+  merchant        Merchant?     @relation(fields: [merchantId], references: [id])
+
+  @@index([userId])
+  @@index([merchantId])
+  @@index([createdAt])
+  @@index([paymentMode])
+}
+
+// SKU - Product configurations
+model Sku {
+  code                String      @id
+  name                String
+  description         String?
+
+  // Payment configuration
+  paymentMode         PaymentMode
+  price               Decimal     @default(0) @db.Decimal(10, 2)
+
+  // Weight-based products (supermarket items)
+  weightGrams         Int?
+  multiplier          Int         @default(1)
+
+  // Flags
+  paymentRequired     Boolean     @default(false)
+  validationRequired  Boolean     @default(false)  // For gift cards
+  active              Boolean     @default(true)
+
+  // Merchant association
+  merchantId          String?
+
+  // Timestamps
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
+
+  // Relations
+  transactions        Transaction[]
+  giftCodes           GiftCode[]
+  merchant            Merchant?   @relation(fields: [merchantId], references: [id])
+
+  @@index([paymentMode])
+  @@index([merchantId])
+}
+
+// GiftCode - Physical gift card codes
+model GiftCode {
+  code          String          @id
+  skuCode       String
+
+  // Status
+  status        GiftCodeStatus  @default(UNUSED)
+
+  // Usage tracking
+  usedByUserId  String?
+  usedAt        DateTime?
+
+  // Timestamps
+  createdAt     DateTime        @default(now())
+
+  // Relations
+  sku           Sku             @relation(fields: [skuCode], references: [code])
+
+  @@index([skuCode])
+  @@index([status])
+}
+
+// Merchant - Business partners
+model Merchant {
+  id                String      @id @default(uuid())
+  name              String
+  email             String      @unique
+
+  // Configuration
+  multiplier        Int         @default(1)     // Impact multiplier (1x, 2x, 5x, 10x)
+  pricePerKg        Decimal?    @db.Decimal(10, 2)  // Custom price, null = use global
+
+  // Monthly billing
+  monthlyBilling    Boolean     @default(true)
+  currentBalance    Decimal     @default(0) @db.Decimal(10, 2)
+  lastBillingDate   DateTime?
+
+  // Stripe Connect
+  stripeAccountId   String?
+
+  // Attribution
+  partnerId         String?
+
+  // Timestamps
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  // Relations
+  transactions      Transaction[]
+  skus              Sku[]
+  invoices          Invoice[]
+
+  @@index([email])
+  @@index([partnerId])
+}
+
+// Invoice - Monthly merchant billing
+model Invoice {
+  id              String    @id @default(uuid())
+  merchantId      String
+
+  // Billing period
+  periodStart     DateTime
+  periodEnd       DateTime
+
+  // Financial data
+  transactionCount Int
+  totalImpactKg   Decimal   @db.Decimal(10, 4)
+  amount          Decimal   @db.Decimal(10, 2)
+
+  // Status
+  paid            Boolean   @default(false)
+  paidAt          DateTime?
+  stripePaymentId String?
+
+  // Timestamps
+  createdAt       DateTime  @default(now())
+
+  // Relations
+  merchant        Merchant  @relation(fields: [merchantId], references: [id])
+
+  @@index([merchantId])
+  @@index([periodStart])
+}
+
+// Setting - Global configurable settings
+model Setting {
+  key           String    @id
+  value         String
+  description   String?
+
+  // Timestamps
+  updatedAt     DateTime  @updatedAt
+}
+
+// MagicLink - Passwordless authentication
+model MagicLink {
+  id          String    @id @default(uuid())
+  userId      String
+  token       String    @unique
+
+  // Expiration
+  expiresAt   DateTime
+  used        Boolean   @default(false)
+
+  // Timestamps
+  createdAt   DateTime  @default(now())
+
+  // Relations
+  user        User      @relation(fields: [userId], references: [id])
+
+  @@index([token])
+  @@index([userId])
+}

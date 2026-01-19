@@ -1,0 +1,7 @@
+node_modules/
+.env
+overview/
+.claude
+csr26
+csr26.pub
+dist/

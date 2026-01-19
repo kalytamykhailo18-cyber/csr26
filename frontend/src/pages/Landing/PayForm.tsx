@@ -1,0 +1,385 @@
+// CSR26 Pay Form Component
+// For Case C: PAY mode (customer pays)
+// RULE: Standard form (name, email) for below threshold, full form for €10+
+// RULE: Use HTML + Tailwind for layout, MUI only for interactive components
+
+import { useState, useEffect } from 'react';
+import TextField from '@mui/material/TextField';
+import Button from '@mui/material/Button';
+import Checkbox from '@mui/material/Checkbox';
+import FormControlLabel from '@mui/material/FormControlLabel';
+import Alert from '@mui/material/Alert';
+import MenuItem from '@mui/material/MenuItem';
+import type { LandingFormData } from '../../types';
+import { COUNTRIES } from '../../types';
+
+// Predefined amount options
+const AMOUNT_OPTIONS = [
+  { value: 1, label: '€1' },
+  { value: 2, label: '€2' },
+  { value: 5, label: '€5' },
+  { value: 10, label: '€10' },
+  { value: 0, label: 'Custom' },
+];
+
+interface PayFormProps {
+  formType: 'minimal' | 'standard' | 'full';
+  message: {
+    title: string;
+    message: string;
+  };
+  impact: {
+    displayValue: string;
+    impactKg: number;
+  };
+  amount: number;
+  onAmountChange: (amount: number) => void;
+  onSubmit: (data: LandingFormData) => Promise<void>;
+  loading: boolean;
+  error: string | null;
+}
+
+const PayForm = ({
+  formType,
+  message: _message, // Passed for API consistency, display handled by parent
+  impact,
+  amount,
+  onAmountChange,
+  onSubmit,
+  loading,
+  error,
+}: PayFormProps) => {
+  const [formData, setFormData] = useState<LandingFormData>({
+    email: '',
+    firstName: '',
+    lastName: '',
+    dateOfBirth: '',
+    street: '',
+    city: '',
+    postalCode: '',
+    country: '',
+    state: '',
+    termsAccepted: false,
+    amount: amount,
+  });
+
+  const [customAmount, setCustomAmount] = useState<string>('');
+  const [showCustomInput, setShowCustomInput] = useState(false);
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+
+  // Sync amount with form data
+  useEffect(() => {
+    setFormData((prev) => ({ ...prev, amount }));
+  }, [amount]);
+
+  const handleChange = (field: keyof LandingFormData) => (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const value = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
+    setFormData((prev) => ({ ...prev, [field]: value }));
+    if (validationErrors[field]) {
+      setValidationErrors((prev) => ({ ...prev, [field]: '' }));
+    }
+  };
+
+  const handleAmountSelect = (value: number) => {
+    if (value === 0) {
+      setShowCustomInput(true);
+    } else {
+      setShowCustomInput(false);
+      setCustomAmount('');
+      onAmountChange(value);
+    }
+  };
+
+  const handleCustomAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setCustomAmount(value);
+    const numValue = parseFloat(value);
+    if (!isNaN(numValue) && numValue >= 1) {
+      onAmountChange(numValue);
+    }
+  };
+
+  const validate = (): boolean => {
+    const errors: Record<string, string> = {};
+
+    // Amount validation
+    if (amount < 1) {
+      errors.amount = 'Minimum contribution is €1';
+    }
+
+    // Email always required
+    if (!formData.email) {
+      errors.email = 'Email is required';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      errors.email = 'Invalid email format';
+    }
+
+    // Standard form requires name
+    if (formType === 'standard' || formType === 'full') {
+      if (!formData.firstName) errors.firstName = 'First name is required';
+      if (!formData.lastName) errors.lastName = 'Last name is required';
+      if (!formData.termsAccepted) errors.termsAccepted = 'You must accept the terms';
+    }
+
+    // Full form requires address
+    if (formType === 'full') {
+      if (!formData.dateOfBirth) errors.dateOfBirth = 'Date of birth is required';
+      if (!formData.street) errors.street = 'Street is required';
+      if (!formData.city) errors.city = 'City is required';
+      if (!formData.postalCode) errors.postalCode = 'Postal code is required';
+      if (!formData.country) errors.country = 'Country is required';
+      if (!formData.state) errors.state = 'State/Province is required';
+    }
+
+    setValidationErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const handleSubmit = async () => {
+    if (validate()) {
+      await onSubmit({ ...formData, amount });
+    }
+  };
+
+  return (
+    <div className="bg-white rounded-md border border-gray-200 p-6 md:p-8">
+      {/* Amount Selection */}
+      <div className="mb-6 animate-fade-down-fast">
+        <label className="block text-sm font-medium text-gray-700 mb-3">
+          Select Your Contribution
+        </label>
+        <div className="grid grid-cols-3 md:grid-cols-5 gap-2 mb-3">
+          {AMOUNT_OPTIONS.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => handleAmountSelect(option.value)}
+              className={`py-3 px-4 rounded-md border text-center transition-colors ${
+                (amount === option.value && !showCustomInput) ||
+                (option.value === 0 && showCustomInput)
+                  ? 'bg-blue-600 text-white border-blue-600'
+                  : 'bg-white text-gray-700 border-gray-300 hover:border-blue-400'
+              }`}
+              disabled={loading}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Custom Amount Input */}
+        {showCustomInput && (
+          <div className="animate-fade-up-fast">
+            <TextField
+              fullWidth
+              label="Custom Amount (€)"
+              type="number"
+              value={customAmount}
+              onChange={handleCustomAmountChange}
+              error={!!validationErrors.amount}
+              helperText={validationErrors.amount || 'Minimum €1'}
+              disabled={loading}
+              slotProps={{
+                htmlInput: { min: 1, step: 0.01 },
+              }}
+            />
+          </div>
+        )}
+      </div>
+
+      {/* Impact Display */}
+      {amount > 0 && (
+        <div className="text-center mb-6 bg-green-50 rounded-md py-4 animate-zoom-in-fast">
+          <p className="text-sm text-gray-500 mb-1">Your Environmental Impact</p>
+          <p className="text-3xl font-bold text-green-600">{impact.displayValue}</p>
+          <p className="text-sm text-gray-500">of plastic removed</p>
+        </div>
+      )}
+
+      {/* Error Alert */}
+      {error && (
+        <Alert severity="error" className="mb-4">
+          {error}
+        </Alert>
+      )}
+
+      <div className="space-y-4">
+        {/* Email */}
+        <div className="animate-fade-right-fast">
+          <TextField
+            fullWidth
+            label="Email"
+            type="email"
+            value={formData.email}
+            onChange={handleChange('email')}
+            error={!!validationErrors.email}
+            helperText={validationErrors.email}
+            disabled={loading}
+            required
+          />
+        </div>
+
+        {/* Standard Form Fields */}
+        {(formType === 'standard' || formType === 'full') && (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fade-right-normal">
+              <TextField
+                fullWidth
+                label="First Name"
+                value={formData.firstName}
+                onChange={handleChange('firstName')}
+                error={!!validationErrors.firstName}
+                helperText={validationErrors.firstName}
+                disabled={loading}
+                required
+              />
+              <TextField
+                fullWidth
+                label="Last Name"
+                value={formData.lastName}
+                onChange={handleChange('lastName')}
+                error={!!validationErrors.lastName}
+                helperText={validationErrors.lastName}
+                disabled={loading}
+                required
+              />
+            </div>
+          </>
+        )}
+
+        {/* Full Form Fields */}
+        {formType === 'full' && (
+          <>
+            <div className="animate-fade-right-light-slow">
+              <TextField
+                fullWidth
+                label="Date of Birth"
+                type="date"
+                value={formData.dateOfBirth}
+                onChange={handleChange('dateOfBirth')}
+                error={!!validationErrors.dateOfBirth}
+                helperText={validationErrors.dateOfBirth}
+                disabled={loading}
+                required
+                slotProps={{
+                  inputLabel: { shrink: true },
+                }}
+              />
+            </div>
+
+            <div className="animate-fade-left-fast">
+              <TextField
+                fullWidth
+                label="Street and House Number"
+                value={formData.street}
+                onChange={handleChange('street')}
+                error={!!validationErrors.street}
+                helperText={validationErrors.street}
+                disabled={loading}
+                required
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fade-left-normal">
+              <TextField
+                fullWidth
+                label="City"
+                value={formData.city}
+                onChange={handleChange('city')}
+                error={!!validationErrors.city}
+                helperText={validationErrors.city}
+                disabled={loading}
+                required
+              />
+              <TextField
+                fullWidth
+                label="Postal Code"
+                value={formData.postalCode}
+                onChange={handleChange('postalCode')}
+                error={!!validationErrors.postalCode}
+                helperText={validationErrors.postalCode}
+                disabled={loading}
+                required
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fade-left-light-slow">
+              <TextField
+                fullWidth
+                select
+                label="Country"
+                value={formData.country}
+                onChange={handleChange('country')}
+                error={!!validationErrors.country}
+                helperText={validationErrors.country}
+                disabled={loading}
+                required
+              >
+                {COUNTRIES.map((country) => (
+                  <MenuItem key={country.code} value={country.code}>
+                    {country.name}
+                  </MenuItem>
+                ))}
+              </TextField>
+              <TextField
+                fullWidth
+                label="State/Province"
+                value={formData.state}
+                onChange={handleChange('state')}
+                error={!!validationErrors.state}
+                helperText={validationErrors.state}
+                disabled={loading}
+                required
+              />
+            </div>
+          </>
+        )}
+
+        {/* Terms Checkbox */}
+        {(formType === 'standard' || formType === 'full') && (
+          <div className="animate-fade-up-fast">
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={formData.termsAccepted}
+                  onChange={handleChange('termsAccepted')}
+                  disabled={loading}
+                />
+              }
+              label={
+                <span className="text-sm text-gray-600">
+                  I accept the Terms of Service and confirm that I have read the Privacy Policy.
+                </span>
+              }
+            />
+            {validationErrors.termsAccepted && (
+              <p className="text-red-500 text-sm mt-1">{validationErrors.termsAccepted}</p>
+            )}
+          </div>
+        )}
+
+        {/* Submit Button */}
+        <div className="pt-4 animate-fade-up-normal">
+          <Button
+            onClick={handleSubmit}
+            variant="contained"
+            fullWidth
+            size="large"
+            disabled={loading || amount < 1}
+            sx={{
+              py: 1.5,
+              textTransform: 'none',
+              fontSize: '1rem',
+            }}
+          >
+            {loading ? 'Processing...' : `Pay €${amount.toFixed(2)} & Claim Impact`}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default PayForm;

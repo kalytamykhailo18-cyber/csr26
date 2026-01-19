@@ -1,0 +1,375 @@
+/* CSR26 Animations CSS
+ * Staggered animations with varied directions and durations
+ * RULE: No delays, each item has unique direction/duration combination
+ */
+
+/* ============================================
+   KEYFRAMES - Animation Directions
+   ============================================ */
+
+/* Fade Up */
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Fade Down */
+@keyframes fadeDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Fade Left (from right to left) */
+@keyframes fadeLeft {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Fade Right (from left to right) */
+@keyframes fadeRight {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Zoom In */
+@keyframes zoomIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Zoom Out */
+@keyframes zoomOut {
+  from {
+    opacity: 0;
+    transform: scale(1.1);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Flip Up */
+@keyframes flipUp {
+  from {
+    opacity: 0;
+    transform: perspective(400px) rotateX(20deg);
+  }
+  to {
+    opacity: 1;
+    transform: perspective(400px) rotateX(0);
+  }
+}
+
+/* Flip Down */
+@keyframes flipDown {
+  from {
+    opacity: 0;
+    transform: perspective(400px) rotateX(-20deg);
+  }
+  to {
+    opacity: 1;
+    transform: perspective(400px) rotateX(0);
+  }
+}
+
+/* ============================================
+   ANIMATION CLASSES - Direction + Duration
+   ============================================ */
+
+/* Duration: very-fast (200ms) */
+.animate-fade-up-very-fast {
+  animation: fadeUp 200ms ease-out forwards;
+}
+
+.animate-fade-down-very-fast {
+  animation: fadeDown 200ms ease-out forwards;
+}
+
+.animate-fade-left-very-fast {
+  animation: fadeLeft 200ms ease-out forwards;
+}
+
+.animate-fade-right-very-fast {
+  animation: fadeRight 200ms ease-out forwards;
+}
+
+.animate-zoom-in-very-fast {
+  animation: zoomIn 200ms ease-out forwards;
+}
+
+.animate-zoom-out-very-fast {
+  animation: zoomOut 200ms ease-out forwards;
+}
+
+.animate-flip-up-very-fast {
+  animation: flipUp 200ms ease-out forwards;
+}
+
+.animate-flip-down-very-fast {
+  animation: flipDown 200ms ease-out forwards;
+}
+
+/* Duration: fast (400ms) */
+.animate-fade-up-fast {
+  animation: fadeUp 400ms ease-out forwards;
+}
+
+.animate-fade-down-fast {
+  animation: fadeDown 400ms ease-out forwards;
+}
+
+.animate-fade-left-fast {
+  animation: fadeLeft 400ms ease-out forwards;
+}
+
+.animate-fade-right-fast {
+  animation: fadeRight 400ms ease-out forwards;
+}
+
+.animate-zoom-in-fast {
+  animation: zoomIn 400ms ease-out forwards;
+}
+
+.animate-zoom-out-fast {
+  animation: zoomOut 400ms ease-out forwards;
+}
+
+.animate-flip-up-fast {
+  animation: flipUp 400ms ease-out forwards;
+}
+
+.animate-flip-down-fast {
+  animation: flipDown 400ms ease-out forwards;
+}
+
+/* Duration: normal (600ms) */
+.animate-fade-up-normal {
+  animation: fadeUp 600ms ease-out forwards;
+}
+
+.animate-fade-down-normal {
+  animation: fadeDown 600ms ease-out forwards;
+}
+
+.animate-fade-left-normal {
+  animation: fadeLeft 600ms ease-out forwards;
+}
+
+.animate-fade-right-normal {
+  animation: fadeRight 600ms ease-out forwards;
+}
+
+.animate-zoom-in-normal {
+  animation: zoomIn 600ms ease-out forwards;
+}
+
+.animate-zoom-out-normal {
+  animation: zoomOut 600ms ease-out forwards;
+}
+
+.animate-flip-up-normal {
+  animation: flipUp 600ms ease-out forwards;
+}
+
+.animate-flip-down-normal {
+  animation: flipDown 600ms ease-out forwards;
+}
+
+/* Duration: light-slow (800ms) */
+.animate-fade-up-light-slow {
+  animation: fadeUp 800ms ease-out forwards;
+}
+
+.animate-fade-down-light-slow {
+  animation: fadeDown 800ms ease-out forwards;
+}
+
+.animate-fade-left-light-slow {
+  animation: fadeLeft 800ms ease-out forwards;
+}
+
+.animate-fade-right-light-slow {
+  animation: fadeRight 800ms ease-out forwards;
+}
+
+.animate-zoom-in-light-slow {
+  animation: zoomIn 800ms ease-out forwards;
+}
+
+.animate-zoom-out-light-slow {
+  animation: zoomOut 800ms ease-out forwards;
+}
+
+.animate-flip-up-light-slow {
+  animation: flipUp 800ms ease-out forwards;
+}
+
+.animate-flip-down-light-slow {
+  animation: flipDown 800ms ease-out forwards;
+}
+
+/* Duration: slow (1000ms) */
+.animate-fade-up-slow {
+  animation: fadeUp 1000ms ease-out forwards;
+}
+
+.animate-fade-down-slow {
+  animation: fadeDown 1000ms ease-out forwards;
+}
+
+.animate-fade-left-slow {
+  animation: fadeLeft 1000ms ease-out forwards;
+}
+
+.animate-fade-right-slow {
+  animation: fadeRight 1000ms ease-out forwards;
+}
+
+.animate-zoom-in-slow {
+  animation: zoomIn 1000ms ease-out forwards;
+}
+
+.animate-zoom-out-slow {
+  animation: zoomOut 1000ms ease-out forwards;
+}
+
+.animate-flip-up-slow {
+  animation: flipUp 1000ms ease-out forwards;
+}
+
+.animate-flip-down-slow {
+  animation: flipDown 1000ms ease-out forwards;
+}
+
+/* Duration: very-slow (1200ms) */
+.animate-fade-up-very-slow {
+  animation: fadeUp 1200ms ease-out forwards;
+}
+
+.animate-fade-down-very-slow {
+  animation: fadeDown 1200ms ease-out forwards;
+}
+
+.animate-fade-left-very-slow {
+  animation: fadeLeft 1200ms ease-out forwards;
+}
+
+.animate-fade-right-very-slow {
+  animation: fadeRight 1200ms ease-out forwards;
+}
+
+.animate-zoom-in-very-slow {
+  animation: zoomIn 1200ms ease-out forwards;
+}
+
+.animate-zoom-out-very-slow {
+  animation: zoomOut 1200ms ease-out forwards;
+}
+
+.animate-flip-up-very-slow {
+  animation: flipUp 1200ms ease-out forwards;
+}
+
+.animate-flip-down-very-slow {
+  animation: flipDown 1200ms ease-out forwards;
+}
+
+/* ============================================
+   INITIAL STATES
+   Before animation starts, elements are invisible
+   ============================================ */
+
+.animate-initial {
+  opacity: 0;
+}
+
+/* ============================================
+   UTILITY CLASSES
+   ============================================ */
+
+/* For elements that should not animate (e.g., when prefers-reduced-motion) */
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-up-very-fast,
+  .animate-fade-down-very-fast,
+  .animate-fade-left-very-fast,
+  .animate-fade-right-very-fast,
+  .animate-zoom-in-very-fast,
+  .animate-zoom-out-very-fast,
+  .animate-flip-up-very-fast,
+  .animate-flip-down-very-fast,
+  .animate-fade-up-fast,
+  .animate-fade-down-fast,
+  .animate-fade-left-fast,
+  .animate-fade-right-fast,
+  .animate-zoom-in-fast,
+  .animate-zoom-out-fast,
+  .animate-flip-up-fast,
+  .animate-flip-down-fast,
+  .animate-fade-up-normal,
+  .animate-fade-down-normal,
+  .animate-fade-left-normal,
+  .animate-fade-right-normal,
+  .animate-zoom-in-normal,
+  .animate-zoom-out-normal,
+  .animate-flip-up-normal,
+  .animate-flip-down-normal,
+  .animate-fade-up-light-slow,
+  .animate-fade-down-light-slow,
+  .animate-fade-left-light-slow,
+  .animate-fade-right-light-slow,
+  .animate-zoom-in-light-slow,
+  .animate-zoom-out-light-slow,
+  .animate-flip-up-light-slow,
+  .animate-flip-down-light-slow,
+  .animate-fade-up-slow,
+  .animate-fade-down-slow,
+  .animate-fade-left-slow,
+  .animate-fade-right-slow,
+  .animate-zoom-in-slow,
+  .animate-zoom-out-slow,
+  .animate-flip-up-slow,
+  .animate-flip-down-slow,
+  .animate-fade-up-very-slow,
+  .animate-fade-down-very-slow,
+  .animate-fade-left-very-slow,
+  .animate-fade-right-very-slow,
+  .animate-zoom-in-very-slow,
+  .animate-zoom-out-very-slow,
+  .animate-flip-up-very-slow,
+  .animate-flip-down-very-slow {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+}
