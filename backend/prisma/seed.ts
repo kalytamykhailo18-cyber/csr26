@@ -55,18 +55,22 @@ async function main() {
   // ============================================
   console.log('Creating admin user...');
 
+  const adminEmail = process.env.ADMIN_EMAIL || 'admin@impactcsr26.it';
+  const adminFirstName = process.env.ADMIN_FIRST_NAME || 'Admin';
+  const adminLastName = process.env.ADMIN_LAST_NAME || 'CSR26';
+
   const adminUser = await prisma.user.upsert({
-    where: { email: 'admin@impactcsr26.it' },
+    where: { email: adminEmail },
     update: {},
     create: {
-      email: 'admin@impactcsr26.it',
-      firstName: 'Admin',
-      lastName: 'CSR26',
+      email: adminEmail,
+      firstName: adminFirstName,
+      lastName: adminLastName,
       role: UserRole.ADMIN,
     },
   });
 
-  console.log(`Admin user created: ${adminUser.id}`);
+  console.log(`Admin user created: ${adminUser.email} (${adminUser.id})`);
 
   // ============================================
   // 3. Create Sample Merchants

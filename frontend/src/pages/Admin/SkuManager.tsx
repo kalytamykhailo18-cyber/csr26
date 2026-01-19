@@ -267,10 +267,16 @@ const SkuManager = () => {
       </div>
 
       {/* Create/Edit Dialog */}
-      <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="sm" fullWidth>
+      <Dialog
+        open={dialogOpen}
+        onClose={() => setDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+        disableRestoreFocus
+      >
         <DialogTitle>{editingSku ? 'Edit SKU' : 'Create New SKU'}</DialogTitle>
-        <DialogContent>
-          <div className="space-y-4 pt-4">
+        <DialogContent sx={{ maxHeight: '70vh', overflowY: 'auto' }}>
+          <div className="space-y-2 pt-4 flex flex-col gap-4">
             <TextField
               label="SKU Code"
               value={formData.code || ''}

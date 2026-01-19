@@ -8,6 +8,7 @@ import {
   fetchAllGiftCodes,
   batchUploadGiftCodes,
   deactivateGiftCode,
+  activateGiftCode,
   clearLastBatchUpload,
 } from '../../store/slices/giftCodeSlice';
 import { fetchAllSkus } from '../../store/slices/skuSlice';
@@ -83,6 +84,12 @@ const GiftCodeManager = () => {
   const handleDeactivate = async (code: string) => {
     if (!confirm('Are you sure you want to deactivate this gift code?')) return;
     await dispatch(deactivateGiftCode(code));
+  };
+
+  // Handle activate
+  const handleActivate = async (code: string) => {
+    if (!confirm('Are you sure you want to activate this gift code?')) return;
+    await dispatch(activateGiftCode(code));
   };
 
   // Get status badge color
@@ -237,6 +244,17 @@ const GiftCodeManager = () => {
                           sx={{ textTransform: 'none' }}
                         >
                           Deactivate
+                        </Button>
+                      )}
+                      {gc.status === 'DEACTIVATED' && (
+                        <Button
+                          variant="outlined"
+                          size="small"
+                          color="success"
+                          onClick={() => handleActivate(gc.code)}
+                          sx={{ textTransform: 'none' }}
+                        >
+                          Activate
                         </Button>
                       )}
                     </td>

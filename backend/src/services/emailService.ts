@@ -162,8 +162,8 @@ export const sendMagicLinkEmail = async (
 ): Promise<{ success: boolean; message: string; magicLinkUrl?: string }> => {
   const magicLinkUrl = `${frontendUrl}/verify/${token}`;
 
-  // Check if we should send email or just log to console
-  const shouldSendEmail = isEmailConfigured() && process.env.NODE_ENV !== 'development';
+  // Check if we should send email - send if SMTP is configured (regardless of NODE_ENV)
+  const shouldSendEmail = isEmailConfigured();
 
   // Always log in development or when email is not configured
   if (!shouldSendEmail) {

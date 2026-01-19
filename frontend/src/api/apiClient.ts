@@ -165,6 +165,9 @@ export const giftCodeApi = {
 
   deactivate: (code: string) =>
     apiClient.delete<ApiResponse<import('../types').GiftCode>>(`/gift-codes/${code}`),
+
+  activate: (code: string) =>
+    apiClient.patch<ApiResponse<import('../types').GiftCode>>(`/gift-codes/${code}/activate`),
 };
 
 // Merchant endpoints

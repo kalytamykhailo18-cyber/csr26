@@ -107,7 +107,6 @@ export const createSku = asyncHandler(async (req: Request, res: Response, _next:
 export const updateSku = asyncHandler(async (req: Request, res: Response, _next: NextFunction) => {
   const code = req.params.code as string;
   if (!code) throw badRequest('Code is required');
-  const updateData = req.body;
 
   // Check if SKU exists
   const existing = await prisma.sku.findUnique({ where: { code } });
@@ -115,9 +114,32 @@ export const updateSku = asyncHandler(async (req: Request, res: Response, _next:
     throw notFound('SKU not found');
   }
 
+  // Extract only allowed fields for update (exclude relations, timestamps, etc.)
+  const {
+    name,
+    description,
+    paymentMode,
+    price,
+    weightGrams,
+    multiplier,
+    paymentRequired,
+    validationRequired,
+    active,
+  } = req.body;
+
   const sku = await prisma.sku.update({
     where: { code },
-    data: updateData,
+    data: {
+      ...(name !== undefined && { name }),
+      ...(description !== undefined && { description }),
+      ...(paymentMode !== undefined && { paymentMode }),
+      ...(price !== undefined && { price: parseFloat(price) || 0 }),
+      ...(weightGrams !== undefined && { weightGrams: weightGrams ? parseInt(weightGrams) : null }),
+      ...(multiplier !== undefined && { multiplier: parseInt(multiplier) || 1 }),
+      ...(paymentRequired !== undefined && { paymentRequired }),
+      ...(validationRequired !== undefined && { validationRequired }),
+      ...(active !== undefined && { active }),
+    },
   });
 
   const response: ApiResponse<Sku> = {

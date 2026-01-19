@@ -164,14 +164,46 @@ export const deactivateGiftCode = asyncHandler(async (req: Request, res: Respons
     throw badRequest('Cannot deactivate an already used code');
   }
 
-  await prisma.giftCode.update({
+  const updatedGiftCode = await prisma.giftCode.update({
     where: { code },
     data: { status: 'DEACTIVATED' },
   });
 
-  const response: ApiResponse<{ message: string }> = {
+  const response: ApiResponse<GiftCode> = {
     success: true,
-    data: { message: 'Gift code deactivated' },
+    data: updatedGiftCode,
+  };
+
+  res.json(response);
+});
+
+// PATCH /api/gift-codes/:code/activate - Activate a deactivated gift code (admin)
+export const activateGiftCode = asyncHandler(async (req: Request, res: Response, _next: NextFunction) => {
+  const codeParam = req.params.code;
+  if (!codeParam) throw badRequest('Code is required');
+  const code = Array.isArray(codeParam) ? codeParam[0] : codeParam;
+
+  const giftCode = await prisma.giftCode.findUnique({ where: { code } });
+  if (!giftCode) {
+    throw notFound('Gift code not found');
+  }
+
+  if (giftCode.status === 'USED') {
+    throw badRequest('Cannot activate an already used code');
+  }
+
+  if (giftCode.status === 'UNUSED') {
+    throw badRequest('Code is already active');
+  }
+
+  const updatedGiftCode = await prisma.giftCode.update({
+    where: { code },
+    data: { status: 'UNUSED' },
+  });
+
+  const response: ApiResponse<GiftCode> = {
+    success: true,
+    data: updatedGiftCode,
   };
 
   res.json(response);

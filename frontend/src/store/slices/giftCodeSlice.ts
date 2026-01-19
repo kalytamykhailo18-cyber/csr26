@@ -78,6 +78,19 @@ export const deactivateGiftCode = createAsyncThunk(
   }
 );
 
+// Async thunk: Activate gift code (admin)
+export const activateGiftCode = createAsyncThunk(
+  'giftCode/activate',
+  async (code: string, { rejectWithValue }) => {
+    try {
+      const response = await giftCodeApi.activate(code);
+      return response.data.data;
+    } catch (error) {
+      return rejectWithValue((error as Error).message);
+    }
+  }
+);
+
 const giftCodeSlice = createSlice({
   name: 'giftCode',
   initialState,
@@ -160,6 +173,25 @@ const giftCodeSlice = createSlice({
         }
       })
       .addCase(deactivateGiftCode.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string;
+      });
+
+    // Activate gift code
+    builder
+      .addCase(activateGiftCode.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(activateGiftCode.fulfilled, (state, action: PayloadAction<GiftCode>) => {
+        state.loading = false;
+        // Update the code in the list
+        const index = state.giftCodes.findIndex(gc => gc.code === action.payload.code);
+        if (index !== -1) {
+          state.giftCodes[index] = action.payload;
+        }
+      })
+      .addCase(activateGiftCode.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload as string;
       });
