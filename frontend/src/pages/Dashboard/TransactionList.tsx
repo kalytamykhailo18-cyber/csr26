@@ -1,7 +1,8 @@
 // CSR26 Transaction List Component
-// Displays user's transaction history
+// Displays user's transaction history with ability to pay pending transactions
 // RULE: Use HTML + Tailwind for layout, MUI only for interactive components
 
+import Button from '@mui/material/Button';
 import type { TransactionWithRelations } from '../../types';
 import {
   formatEUR,
@@ -13,9 +14,10 @@ import {
 
 interface TransactionListProps {
   transactions: TransactionWithRelations[];
+  onPayNow?: (transaction: TransactionWithRelations) => void;
 }
 
-const TransactionList = ({ transactions }: TransactionListProps) => {
+const TransactionList = ({ transactions, onPayNow }: TransactionListProps) => {
   if (transactions.length === 0) {
     return (
       <div className="bg-white rounded-md border border-gray-200 p-8 text-center">
@@ -100,19 +102,37 @@ const TransactionList = ({ transactions }: TransactionListProps) => {
                     {transaction.merchant?.name || '-'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span
-                      className={`inline-flex px-2 py-1 text-xs font-medium rounded-md ${
-                        statusInfo.color === 'success'
-                          ? 'bg-green-100 text-green-800'
-                          : statusInfo.color === 'warning'
-                          ? 'bg-yellow-100 text-yellow-800'
-                          : statusInfo.color === 'error'
-                          ? 'bg-red-100 text-red-800'
-                          : 'bg-gray-100 text-gray-800'
-                      }`}
-                    >
-                      {statusInfo.text}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`inline-flex px-2 py-1 text-xs font-medium rounded-md ${
+                          statusInfo.color === 'success'
+                            ? 'bg-green-100 text-green-800'
+                            : statusInfo.color === 'warning'
+                            ? 'bg-yellow-100 text-yellow-800'
+                            : statusInfo.color === 'error'
+                            ? 'bg-red-100 text-red-800'
+                            : 'bg-gray-100 text-gray-800'
+                        }`}
+                      >
+                        {statusInfo.text}
+                      </span>
+                      {transaction.paymentStatus === 'PENDING' && onPayNow && (
+                        <Button
+                          variant="contained"
+                          size="small"
+                          onClick={() => onPayNow(transaction)}
+                          sx={{
+                            textTransform: 'none',
+                            fontSize: '0.75rem',
+                            py: 0.5,
+                            px: 1.5,
+                            minWidth: 'auto',
+                          }}
+                        >
+                          Pay Now
+                        </Button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               );
@@ -163,6 +183,22 @@ const TransactionList = ({ transactions }: TransactionListProps) => {
                   </p>
                 </div>
               </div>
+              {/* Pay Now button for pending transactions */}
+              {transaction.paymentStatus === 'PENDING' && onPayNow && (
+                <div className="mt-3">
+                  <Button
+                    variant="contained"
+                    size="small"
+                    fullWidth
+                    onClick={() => onPayNow(transaction)}
+                    sx={{
+                      textTransform: 'none',
+                    }}
+                  >
+                    Pay Now - {formatEUR(transaction.amount)}
+                  </Button>
+                </div>
+              )}
             </div>
           );
         })}

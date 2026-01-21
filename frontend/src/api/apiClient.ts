@@ -195,6 +195,9 @@ export const merchantApi = {
 export const paymentApi = {
   createIntent: (data: import('../types').CreatePaymentIntentRequest) =>
     apiClient.post<ApiResponse<import('../types').PaymentIntentResponse>>('/payments/create-intent', data),
+
+  resumePayment: (transactionId: string) =>
+    apiClient.post<ApiResponse<import('../types').PaymentIntentResponse>>(`/payments/resume/${transactionId}`),
 };
 
 // User endpoints (admin)

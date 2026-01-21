@@ -2,7 +2,7 @@
 // Main dashboard showing wallet, progress, and transaction history
 // DATA FLOW: Component mount → dispatch fetchWallet → Redux → API → Response → UI
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { fetchWallet } from '../../store/slices/walletSlice';
 import { fetchTransactions } from '../../store/slices/transactionSlice';
@@ -14,13 +14,19 @@ import WalletCard from './WalletCard';
 import ProgressBar from './ProgressBar';
 import TransactionList from './TransactionList';
 import MaturationTimeline from './MaturationTimeline';
+import PendingPaymentModal from './PendingPaymentModal';
 import Alert from '@mui/material/Alert';
 import Button from '@mui/material/Button';
 import { formatWeightKg } from '../../utils/formatters';
+import type { TransactionWithRelations } from '../../types';
 
 const Dashboard = () => {
   const dispatch = useAppDispatch();
   const { goToLanding } = useNavigation();
+
+  // Local state for payment modal
+  const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+  const [selectedTransaction, setSelectedTransaction] = useState<TransactionWithRelations | null>(null);
 
   // Redux state
   const { user, isAuthenticated } = useAppSelector((state) => state.auth);
@@ -54,6 +60,21 @@ const Dashboard = () => {
 
   const handleContributeMore = () => {
     goToLanding();
+  };
+
+  // Handle Pay Now button click for pending transactions
+  const handlePayNow = (transaction: TransactionWithRelations) => {
+    setSelectedTransaction(transaction);
+    setPaymentModalOpen(true);
+  };
+
+  // Handle successful payment
+  const handlePaymentSuccess = () => {
+    // Refresh wallet and transactions after successful payment
+    dispatch(fetchWallet());
+    dispatch(fetchTransactions({}));
+    setPaymentModalOpen(false);
+    setSelectedTransaction(null);
   };
 
   return (
@@ -196,7 +217,10 @@ const Dashboard = () => {
 
               {/* Transaction History */}
               <div className="animate-fade-up-light-slow">
-                <TransactionList transactions={transactions} />
+                <TransactionList
+                  transactions={transactions}
+                  onPayNow={handlePayNow}
+                />
               </div>
 
               {/* Call to Action */}
@@ -220,6 +244,17 @@ const Dashboard = () => {
 
       {/* Footer */}
       <Footer />
+
+      {/* Payment Modal for Pending Transactions */}
+      <PendingPaymentModal
+        open={paymentModalOpen}
+        transaction={selectedTransaction}
+        onClose={() => {
+          setPaymentModalOpen(false);
+          setSelectedTransaction(null);
+        }}
+        onSuccess={handlePaymentSuccess}
+      />
     </div>
   );
 };

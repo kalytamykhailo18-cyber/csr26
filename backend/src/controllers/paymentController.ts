@@ -89,6 +89,99 @@ export const createPaymentIntent = asyncHandler(async (req: Request, res: Respon
   res.json(response);
 });
 
+// POST /api/payments/resume/:transactionId - Resume payment for pending transaction
+export const resumePayment = asyncHandler(async (req: Request, res: Response, _next: NextFunction) => {
+  if (!stripe) {
+    throw internalError('Stripe not configured');
+  }
+
+  const { transactionId } = req.params;
+  const userId = req.user?.id;
+
+  if (!userId) {
+    throw badRequest('Authentication required');
+  }
+
+  // Find the pending transaction with user
+  const transaction = await prisma.transaction.findFirst({
+    where: {
+      id: String(transactionId),
+      userId: String(userId),
+      paymentStatus: 'PENDING',
+    },
+  });
+
+  if (!transaction) {
+    throw badRequest('Pending transaction not found');
+  }
+
+  // Get user email for the receipt
+  const transactionUser = await prisma.user.findUnique({
+    where: { id: transaction.userId },
+  });
+
+  if (!transactionUser) {
+    throw badRequest('User not found');
+  }
+
+  // Check if existing payment intent is still valid
+  let clientSecret: string | null = null;
+  let paymentIntentId = transaction.stripePaymentId;
+
+  if (transaction.stripePaymentId) {
+    try {
+      const existingIntent = await stripe.paymentIntents.retrieve(transaction.stripePaymentId);
+
+      // If intent is still usable (not expired, not succeeded, not cancelled)
+      if (
+        existingIntent.status === 'requires_payment_method' ||
+        existingIntent.status === 'requires_confirmation' ||
+        existingIntent.status === 'requires_action'
+      ) {
+        clientSecret = existingIntent.client_secret;
+      }
+    } catch (err) {
+      // Intent not found or expired, will create new one
+      console.log('Existing payment intent not usable, creating new one');
+    }
+  }
+
+  // If no valid intent, create a new one
+  if (!clientSecret) {
+    const newIntent = await stripe.paymentIntents.create({
+      amount: Math.round(Number(transaction.amount) * 100),
+      currency: 'eur',
+      metadata: {
+        userId: transaction.userId,
+        transactionId: transaction.id,
+        skuCode: transaction.skuCode || '',
+        impactKg: transaction.impactKg.toString(),
+      },
+      receipt_email: transactionUser.email,
+    });
+
+    paymentIntentId = newIntent.id;
+
+    // Update transaction with new payment intent ID
+    await prisma.transaction.update({
+      where: { id: transaction.id },
+      data: { stripePaymentId: newIntent.id },
+    });
+
+    clientSecret = newIntent.client_secret;
+  }
+
+  const response: ApiResponse<PaymentIntentResponse> = {
+    success: true,
+    data: {
+      clientSecret: clientSecret!,
+      paymentIntentId: paymentIntentId!,
+    },
+  };
+
+  res.json(response);
+});
+
 // POST /api/payments/webhook - Stripe webhook handler
 export const handleWebhook = async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
   if (!stripe || !stripeWebhookSecret) {
