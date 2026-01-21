@@ -2,6 +2,7 @@
 // For Case F: GENERAL mode (marketing/direct landing, no SKU)
 // RULE: Shows general message, customer chooses amount
 // RULE: Use HTML + Tailwind for layout, MUI only for interactive components
+// DATA FLOW: Form input → Validate → Create Payment Intent → Stripe Payment → Confirm → Update wallet
 
 import { useState, useEffect } from 'react';
 import TextField from '@mui/material/TextField';
@@ -13,6 +14,8 @@ import MenuItem from '@mui/material/MenuItem';
 import PublicIcon from '@mui/icons-material/Public';
 import type { LandingFormData } from '../../types';
 import { COUNTRIES } from '../../types';
+import StripePaymentForm from '../../components/StripePaymentForm';
+import { formatEUR } from '../../utils/formatters';
 
 // Predefined amount options
 const AMOUNT_OPTIONS = [
@@ -42,7 +45,7 @@ interface GeneralFormProps {
 
 const GeneralForm = ({
   formType,
-  message: _message, // Passed for API consistency, display handled by parent
+  message: _message,
   impact,
   amount,
   onAmountChange,
@@ -67,6 +70,8 @@ const GeneralForm = ({
   const [customAmount, setCustomAmount] = useState<string>('');
   const [showCustomInput, setShowCustomInput] = useState(false);
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+  const [showPaymentForm, setShowPaymentForm] = useState(false);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
 
   useEffect(() => {
     setFormData((prev) => ({ ...prev, amount }));
@@ -133,11 +138,81 @@ const GeneralForm = ({
     return Object.keys(errors).length === 0;
   };
 
-  const handleSubmit = async () => {
+  // Step 1: Validate form and proceed to payment
+  const handleProceedToPayment = () => {
     if (validate()) {
-      await onSubmit({ ...formData, amount });
+      setPaymentError(null);
+      setShowPaymentForm(true);
     }
   };
+
+  // Step 2: Payment successful - create transaction
+  const handlePaymentSuccess = async () => {
+    try {
+      await onSubmit({ ...formData, amount });
+    } catch (err) {
+      setPaymentError(err instanceof Error ? err.message : 'Failed to complete transaction');
+    }
+  };
+
+  // Handle payment error
+  const handlePaymentError = (errorMsg: string) => {
+    setPaymentError(errorMsg);
+  };
+
+  // Go back from payment form
+  const handleBackToForm = () => {
+    setShowPaymentForm(false);
+    setPaymentError(null);
+  };
+
+  // If showing payment form
+  if (showPaymentForm) {
+    return (
+      <div className="bg-white rounded-md border border-gray-200 p-6 md:p-8">
+        {/* Payment Summary */}
+        <div className="mb-6 pb-6 border-b border-gray-200">
+          <h3 className="text-lg font-semibold text-gray-800 mb-4">Payment Summary</h3>
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-gray-600">Environmental Allocation</span>
+            <span className="font-semibold">{formatEUR(amount)}</span>
+          </div>
+          <div className="flex justify-between items-center text-green-600">
+            <span>Impact</span>
+            <span className="font-semibold">{impact.displayValue} plastic removed</span>
+          </div>
+        </div>
+
+        {/* Payment Error */}
+        {paymentError && (
+          <Alert severity="error" className="mb-4">
+            {paymentError}
+          </Alert>
+        )}
+
+        {/* Stripe Payment Form */}
+        <StripePaymentForm
+          amount={amount}
+          email={formData.email}
+          onSuccess={handlePaymentSuccess}
+          onError={handlePaymentError}
+          onCancel={handleBackToForm}
+        />
+
+        {/* Back Button */}
+        <div className="mt-4">
+          <Button
+            onClick={handleBackToForm}
+            variant="text"
+            fullWidth
+            sx={{ textTransform: 'none' }}
+          >
+            ← Back to Form
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-white rounded-md border border-gray-200 p-6 md:p-8">
@@ -376,10 +451,10 @@ const GeneralForm = ({
           </div>
         )}
 
-        {/* Submit Button */}
+        {/* Proceed to Payment Button */}
         <div className="pt-4 animate-fade-up-normal">
           <Button
-            onClick={handleSubmit}
+            onClick={handleProceedToPayment}
             variant="contained"
             fullWidth
             size="large"
@@ -390,7 +465,7 @@ const GeneralForm = ({
               fontSize: '1rem',
             }}
           >
-            {loading ? 'Processing...' : `Contribute €${amount.toFixed(2)} & Make an Impact`}
+            {loading ? 'Processing...' : `Continue to Payment - ${formatEUR(amount)}`}
           </Button>
         </div>
       </div>

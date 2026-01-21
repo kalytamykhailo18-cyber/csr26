@@ -136,11 +136,18 @@ export interface TransactionWithRelations extends Transaction {
 // ============================================
 
 export interface WalletSummary {
-  balance: number;      // Total EUR
-  impactKg: number;     // Total kg removed
+  balance: number;            // Total EUR
+  impactKg: number;           // Total kg removed
+  maturedImpactKg: number;    // Impact that has matured (available now)
+  pendingImpactKg: number;    // Impact still in maturation
+  bottles: number;            // Equivalent plastic bottles
   status: UserStatus;
   transactionCount: number;
-  thresholdProgress: number; // Percentage to €10 threshold
+  thresholdProgress: number;  // Percentage to €10 threshold
+  upcomingMaturations?: Array<{
+    amount: number;
+    date: string;
+  }>;
 }
 
 // ============================================
@@ -214,6 +221,39 @@ export interface ImpactCalculation {
   displayValue: string; // "450g" or "9.09 kg"
   belowThreshold: boolean;
   thresholdProgress: number;
+  maturation?: MaturationBreakdown;
+}
+
+// ============================================
+// Maturation Types (5/45/50 Rule)
+// ============================================
+
+export interface MaturationBreakdown {
+  totalKg: number;
+  immediateKg: number;      // 5% immediately
+  midTermKg: number;        // 45% at 40 weeks
+  finalKg: number;          // 50% at 80 weeks
+  midTermMaturesAt: Date;   // Date when 45% matures
+  finalMaturesAt: Date;     // Date when 50% matures
+  immediatePercent: number; // 5
+  midTermPercent: number;   // 45
+  finalPercent: number;     // 50
+}
+
+export interface UserImpactSummary {
+  totalImpactKg: number;
+  maturedImpactKg: number;
+  pendingImpactKg: number;
+  upcomingMaturations: Array<{
+    amount: number;
+    date: Date;
+  }>;
+}
+
+export interface ImpactVisualization {
+  kg: string;
+  bottles: number;
+  bottlesDisplay: string;
 }
 
 // ============================================

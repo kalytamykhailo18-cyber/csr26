@@ -1,7 +1,11 @@
 import { Request, Response, NextFunction } from 'express';
 import { asyncHandler, badRequest, internalError } from '../middleware/errorHandler.js';
 import { prisma } from '../lib/prisma.js';
-import { calculateImpact, updateUserWallet } from '../services/calculationService.js';
+import {
+  calculateImpact,
+  updateUserWallet,
+  calculateMaturationBreakdown,
+} from '../services/calculationService.js';
 import Stripe from 'stripe';
 import type { ApiResponse, CreatePaymentIntentRequest, PaymentIntentResponse } from '../types/index.js';
 
@@ -52,7 +56,10 @@ export const createPaymentIntent = asyncHandler(async (req: Request, res: Respon
     receipt_email: email,
   });
 
-  // Create pending transaction
+  // Calculate maturation breakdown
+  const maturation = calculateMaturationBreakdown(impact.impactKg);
+
+  // Create pending transaction with maturation data
   await prisma.transaction.create({
     data: {
       userId: user.id,
@@ -62,6 +69,12 @@ export const createPaymentIntent = asyncHandler(async (req: Request, res: Respon
       paymentMode: 'PAY',
       paymentStatus: 'PENDING',
       stripePaymentId: paymentIntent.id,
+      // Maturation tracking (5/45/50 Rule)
+      immediateImpactKg: maturation.immediateKg,
+      midTermImpactKg: maturation.midTermKg,
+      finalImpactKg: maturation.finalKg,
+      midTermMaturesAt: maturation.midTermMaturesAt,
+      finalMaturesAt: maturation.finalMaturesAt,
     },
   });
 

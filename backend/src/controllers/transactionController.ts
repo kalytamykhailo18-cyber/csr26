@@ -1,7 +1,12 @@
 import { Request, Response, NextFunction } from 'express';
 import { asyncHandler, badRequest, notFound } from '../middleware/errorHandler.js';
 import { prisma } from '../lib/prisma.js';
-import { calculateImpact, calculateWeightBasedImpact, updateUserWallet } from '../services/calculationService.js';
+import {
+  calculateImpact,
+  calculateWeightBasedImpact,
+  updateUserWallet,
+  calculateMaturationBreakdown,
+} from '../services/calculationService.js';
 import type { ApiResponse, CreateTransactionRequest, Transaction, TransactionWithRelations } from '../types/index.js';
 
 // POST /api/transactions - Create new transaction
@@ -47,7 +52,10 @@ export const createTransaction = asyncHandler(async (req: Request, res: Response
     impact = await calculateImpact(finalAmount);
   }
 
-  // Create transaction
+  // Calculate maturation breakdown
+  const maturation = calculateMaturationBreakdown(impact.impactKg);
+
+  // Create transaction with maturation data
   const transaction = await prisma.transaction.create({
     data: {
       userId,
@@ -61,6 +69,12 @@ export const createTransaction = asyncHandler(async (req: Request, res: Response
       giftCodeUsed: giftCode,
       weightGrams,
       multiplier,
+      // Maturation tracking (5/45/50 Rule)
+      immediateImpactKg: maturation.immediateKg,
+      midTermImpactKg: maturation.midTermKg,
+      finalImpactKg: maturation.finalKg,
+      midTermMaturesAt: maturation.midTermMaturesAt,
+      finalMaturesAt: maturation.finalMaturesAt,
     },
     include: {
       user: true,

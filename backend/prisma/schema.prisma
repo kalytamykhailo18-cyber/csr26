@@ -67,6 +67,12 @@ model User {
   walletImpactKg  Decimal     @default(0) @db.Decimal(10, 4)
   status          UserStatus  @default(ACCUMULATION)
 
+  // Maturation tracking (5/45/50 Rule)
+  // maturedImpactKg = impact that has already matured and is available
+  // pendingImpactKg = impact still in maturation process
+  maturedImpactKg Decimal     @default(0) @db.Decimal(10, 4)
+  pendingImpactKg Decimal     @default(0) @db.Decimal(10, 4)
+
   // Corsair Connect integration
   corsairExported Boolean     @default(false)
   corsairId       String?
@@ -110,6 +116,16 @@ model Transaction {
   weightGrams     Int?
   multiplier      Int?
 
+  // Maturation tracking (5/45/50 Rule)
+  // immediateImpactKg = 5% immediately available
+  // midTermImpactKg = 45% available at 40 weeks
+  // finalImpactKg = 50% available at 80 weeks
+  immediateImpactKg Decimal?    @db.Decimal(10, 4)
+  midTermImpactKg   Decimal?    @db.Decimal(10, 4)
+  finalImpactKg     Decimal?    @db.Decimal(10, 4)
+  midTermMaturesAt  DateTime?   // Date when 45% matures (40 weeks from creation)
+  finalMaturesAt    DateTime?   // Date when 50% matures (80 weeks from creation)
+
   // Timestamps
   createdAt       DateTime      @default(now())
 
@@ -122,6 +138,8 @@ model Transaction {
   @@index([merchantId])
   @@index([createdAt])
   @@index([paymentMode])
+  @@index([midTermMaturesAt])
+  @@index([finalMaturesAt])
 }
 
 // SKU - Product configurations

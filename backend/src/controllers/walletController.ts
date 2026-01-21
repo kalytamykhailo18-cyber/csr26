@@ -1,10 +1,14 @@
 import { Request, Response, NextFunction } from 'express';
-import { asyncHandler } from '../middleware/errorHandler.js';
+import { asyncHandler, notFound } from '../middleware/errorHandler.js';
 import { prisma } from '../lib/prisma.js';
-import { getCertificationThreshold } from '../services/calculationService.js';
+import {
+  getCertificationThreshold,
+  calculateUserMaturedImpact,
+  formatImpactWithBottles,
+} from '../services/calculationService.js';
 import type { ApiResponse, WalletSummary } from '../types/index.js';
 
-// GET /api/wallet - Get user's wallet summary
+// GET /api/wallet - Get current user's wallet
 export const getWallet = asyncHandler(async (req: Request, res: Response, _next: NextFunction) => {
   const userId = req.user!.id;
 
@@ -13,23 +17,40 @@ export const getWallet = asyncHandler(async (req: Request, res: Response, _next:
     select: {
       walletBalance: true,
       walletImpactKg: true,
+      maturedImpactKg: true,
+      pendingImpactKg: true,
       status: true,
-      _count: {
-        select: { transactions: true },
-      },
+      _count: { select: { transactions: true } },
     },
   });
 
+  if (!user) {
+    throw notFound('User not found');
+  }
+
   const threshold = await getCertificationThreshold();
-  const balance = Number(user!.walletBalance);
-  const thresholdProgress = Math.min((balance / threshold) * 100, 100);
+  const balance = Number(user.walletBalance);
+  const impactKg = Number(user.walletImpactKg);
+
+  // Calculate matured impact from transactions (more accurate)
+  const impactSummary = await calculateUserMaturedImpact(userId);
+
+  // Calculate bottle equivalent
+  const { bottles } = formatImpactWithBottles(impactSummary.maturedImpactKg);
 
   const walletSummary: WalletSummary = {
     balance,
-    impactKg: Number(user!.walletImpactKg),
-    status: user!.status,
-    transactionCount: user!._count.transactions,
-    thresholdProgress,
+    impactKg,
+    maturedImpactKg: impactSummary.maturedImpactKg,
+    pendingImpactKg: impactSummary.pendingImpactKg,
+    bottles,
+    status: user.status,
+    transactionCount: user._count.transactions,
+    thresholdProgress: Math.min((balance / threshold) * 100, 100),
+    upcomingMaturations: impactSummary.upcomingMaturations.map(m => ({
+      amount: m.amount,
+      date: m.date.toISOString(),
+    })),
   };
 
   const response: ApiResponse<WalletSummary> = {
@@ -40,19 +61,20 @@ export const getWallet = asyncHandler(async (req: Request, res: Response, _next:
   res.json(response);
 });
 
-// GET /api/wallet/email/:email - Get wallet summary by email (public, for landing page)
+// GET /api/wallet/email/:email - Get wallet by email (for landing page)
 export const getWalletByEmail = asyncHandler(async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
   const email = req.params.email as string;
 
   const user = await prisma.user.findUnique({
     where: { email },
     select: {
+      id: true,
       walletBalance: true,
       walletImpactKg: true,
+      maturedImpactKg: true,
+      pendingImpactKg: true,
       status: true,
-      _count: {
-        select: { transactions: true },
-      },
+      _count: { select: { transactions: true } },
     },
   });
 
@@ -63,25 +85,42 @@ export const getWalletByEmail = asyncHandler(async (req: Request, res: Response,
       data: {
         balance: 0,
         impactKg: 0,
+        maturedImpactKg: 0,
+        pendingImpactKg: 0,
+        bottles: 0,
         status: 'ACCUMULATION',
         transactionCount: 0,
         thresholdProgress: 0,
       },
     };
+
     res.json(response);
     return;
   }
 
   const threshold = await getCertificationThreshold();
   const balance = Number(user.walletBalance);
-  const thresholdProgress = Math.min((balance / threshold) * 100, 100);
+  const impactKg = Number(user.walletImpactKg);
+
+  // Calculate matured impact from transactions
+  const impactSummary = await calculateUserMaturedImpact(user.id);
+
+  // Calculate bottle equivalent
+  const { bottles } = formatImpactWithBottles(impactSummary.maturedImpactKg);
 
   const walletSummary: WalletSummary = {
     balance,
-    impactKg: Number(user.walletImpactKg),
+    impactKg,
+    maturedImpactKg: impactSummary.maturedImpactKg,
+    pendingImpactKg: impactSummary.pendingImpactKg,
+    bottles,
     status: user.status,
     transactionCount: user._count.transactions,
-    thresholdProgress,
+    thresholdProgress: Math.min((balance / threshold) * 100, 100),
+    upcomingMaturations: impactSummary.upcomingMaturations.map(m => ({
+      amount: m.amount,
+      date: m.date.toISOString(),
+    })),
   };
 
   const response: ApiResponse<WalletSummary> = {
@@ -108,6 +147,11 @@ export const getWalletHistory = asyncHandler(async (req: Request, res: Response,
       impactKg: true,
       paymentMode: true,
       createdAt: true,
+      immediateImpactKg: true,
+      midTermImpactKg: true,
+      finalImpactKg: true,
+      midTermMaturesAt: true,
+      finalMaturesAt: true,
       sku: {
         select: { name: true },
       },

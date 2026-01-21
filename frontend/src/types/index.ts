@@ -299,11 +299,18 @@ export interface TransactionListResponse {
 // ============================================
 
 export interface WalletSummary {
-  balance: number;          // Total EUR
-  impactKg: number;         // Total kg removed
+  balance: number;            // Total EUR
+  impactKg: number;           // Total kg removed
+  maturedImpactKg: number;    // Impact that has matured (available now)
+  pendingImpactKg: number;    // Impact still in maturation
+  bottles: number;            // Equivalent plastic bottles
   status: UserStatus;
   transactionCount: number;
-  thresholdProgress: number; // Percentage to €10 threshold (0-100)
+  thresholdProgress: number;  // Percentage to €10 threshold (0-100)
+  upcomingMaturations?: Array<{
+    amount: number;
+    date: string;
+  }>;
 }
 
 // ============================================

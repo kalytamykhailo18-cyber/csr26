@@ -14,6 +14,8 @@ import MerchantDashboardPage from '../pages/MerchantDashboard';
 import AdminPage from '../pages/Admin';
 import LoginPage from '../pages/Login';
 import VerifyPage from '../pages/Verify';
+import TermsPage from '../pages/Terms';
+import PrivacyPage from '../pages/Privacy';
 
 // Not Found component
 const NotFound = () => {
@@ -80,6 +82,8 @@ const AppRoutes = () => {
       <Route path="/landing" element={<LandingPage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/verify/:token" element={<VerifyPage />} />
+      <Route path="/terms" element={<TermsPage />} />
+      <Route path="/privacy" element={<PrivacyPage />} />
 
       {/* Protected user routes */}
       <Route

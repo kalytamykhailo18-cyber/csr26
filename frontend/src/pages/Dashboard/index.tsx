@@ -13,6 +13,7 @@ import LoadingSpinner from '../../components/LoadingSpinner';
 import WalletCard from './WalletCard';
 import ProgressBar from './ProgressBar';
 import TransactionList from './TransactionList';
+import MaturationTimeline from './MaturationTimeline';
 import Alert from '@mui/material/Alert';
 import Button from '@mui/material/Button';
 import { formatWeightKg } from '../../utils/formatters';
@@ -92,6 +93,9 @@ const Dashboard = () => {
                 <WalletCard
                   balance={wallet?.balance || 0}
                   impactKg={wallet?.impactKg || 0}
+                  maturedImpactKg={wallet?.maturedImpactKg || 0}
+                  pendingImpactKg={wallet?.pendingImpactKg || 0}
+                  bottles={wallet?.bottles || 0}
                   status={wallet?.status || 'ACCUMULATION'}
                   transactionCount={wallet?.transactionCount || 0}
                 />
@@ -104,6 +108,18 @@ const Dashboard = () => {
                     progress={thresholdProgress}
                     currentAmount={wallet?.balance || 0}
                     threshold={effectiveThreshold}
+                  />
+                </div>
+              )}
+
+              {/* Maturation Timeline (show if there's pending impact) */}
+              {(wallet?.pendingImpactKg || 0) > 0 && (
+                <div className="animate-fade-up-normal">
+                  <MaturationTimeline
+                    totalImpactKg={wallet?.impactKg || 0}
+                    maturedImpactKg={wallet?.maturedImpactKg || 0}
+                    pendingImpactKg={wallet?.pendingImpactKg || 0}
+                    upcomingMaturations={wallet?.upcomingMaturations}
                   />
                 </div>
               )}
