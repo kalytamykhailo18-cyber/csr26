@@ -233,7 +233,15 @@ const LandingPage = () => {
         return;
       }
 
-      // Create transaction
+      // For PAY mode (Case C and F), transaction was already created by createPaymentIntent
+      // and confirmed by confirmPayment - just show success
+      if (paymentMode === 'PAY') {
+        submittedRef.current = true;
+        setSubmitted(true);
+        return;
+      }
+
+      // For other modes, create transaction
       const transactionData = {
         skuCode: currentSku?.code,
         amount: amount,

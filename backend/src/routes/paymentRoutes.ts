@@ -11,6 +11,9 @@ router.post('/create-intent', optionalAuth, paymentController.createPaymentInten
 // POST /api/payments/resume/:transactionId - Resume payment for pending transaction
 router.post('/resume/:transactionId', authenticate, paymentController.resumePayment);
 
+// POST /api/payments/confirm/:transactionId - Confirm payment and sync data after Stripe success
+router.post('/confirm/:transactionId', authenticate, paymentController.confirmPayment);
+
 // POST /api/payments/webhook - Stripe webhook handler
 // Note: This needs raw body, not JSON parsed
 router.post(

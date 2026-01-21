@@ -60,7 +60,7 @@ export const createPaymentIntent = asyncHandler(async (req: Request, res: Respon
   const maturation = calculateMaturationBreakdown(impact.impactKg);
 
   // Create pending transaction with maturation data
-  await prisma.transaction.create({
+  const transaction = await prisma.transaction.create({
     data: {
       userId: user.id,
       skuCode,
@@ -78,11 +78,12 @@ export const createPaymentIntent = asyncHandler(async (req: Request, res: Respon
     },
   });
 
-  const response: ApiResponse<PaymentIntentResponse> = {
+  const response: ApiResponse<PaymentIntentResponse & { transactionId: string }> = {
     success: true,
     data: {
       clientSecret: paymentIntent.client_secret!,
       paymentIntentId: paymentIntent.id,
+      transactionId: transaction.id,
     },
   };
 
@@ -180,6 +181,92 @@ export const resumePayment = asyncHandler(async (req: Request, res: Response, _n
   };
 
   res.json(response);
+});
+
+// POST /api/payments/confirm/:transactionId - Confirm payment and sync data
+// Called by frontend after Stripe confirms payment to ensure data is synced
+export const confirmPayment = asyncHandler(async (req: Request, res: Response, _next: NextFunction) => {
+  if (!stripe) {
+    throw internalError('Stripe not configured');
+  }
+
+  const { transactionId } = req.params;
+  const userId = req.user?.id;
+
+  if (!userId) {
+    throw badRequest('Authentication required');
+  }
+
+  // Find the transaction
+  const transaction = await prisma.transaction.findFirst({
+    where: {
+      id: String(transactionId),
+      userId: String(userId),
+    },
+  });
+
+  if (!transaction) {
+    throw badRequest('Transaction not found');
+  }
+
+  // If already completed, just return success
+  if (transaction.paymentStatus === 'COMPLETED') {
+    res.json({
+      success: true,
+      data: { status: 'COMPLETED', message: 'Payment already confirmed' },
+    });
+    return;
+  }
+
+  // Check payment intent status with Stripe
+  if (!transaction.stripePaymentId) {
+    throw badRequest('No payment intent associated with this transaction');
+  }
+
+  const paymentIntent = await stripe.paymentIntents.retrieve(transaction.stripePaymentId);
+
+  if (paymentIntent.status === 'succeeded') {
+    // Update transaction status
+    await prisma.transaction.update({
+      where: { id: transaction.id },
+      data: { paymentStatus: 'COMPLETED' },
+    });
+
+    // Update user wallet with maturation tracking
+    await updateUserWallet(
+      transaction.userId,
+      Number(transaction.amount),
+      Number(transaction.impactKg)
+    );
+
+    console.log(`[PAYMENT] Confirmed payment for transaction ${transaction.id}`);
+
+    res.json({
+      success: true,
+      data: { status: 'COMPLETED', message: 'Payment confirmed successfully' },
+    });
+  } else if (paymentIntent.status === 'processing') {
+    res.json({
+      success: true,
+      data: { status: 'PROCESSING', message: 'Payment is still processing' },
+    });
+  } else if (paymentIntent.status === 'requires_action' || paymentIntent.status === 'requires_confirmation') {
+    res.json({
+      success: true,
+      data: { status: 'PENDING', message: 'Payment requires additional action' },
+    });
+  } else {
+    // Payment failed or cancelled
+    await prisma.transaction.update({
+      where: { id: transaction.id },
+      data: { paymentStatus: 'FAILED' },
+    });
+
+    res.json({
+      success: true,
+      data: { status: 'FAILED', message: 'Payment was not successful' },
+    });
+  }
 });
 
 // POST /api/payments/webhook - Stripe webhook handler

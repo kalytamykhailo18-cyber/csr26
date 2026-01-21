@@ -150,11 +150,16 @@ const PayForm = ({
     }
   };
 
-  // Step 2: Payment successful - create transaction
-  const handlePaymentSuccess = async () => {
+  // Step 2: Payment successful - transaction already created by createPaymentIntent
+  // Just show success, don't create another transaction
+  const handlePaymentSuccess = async (_transactionId: string) => {
     try {
+      // Transaction was already created by createPaymentIntent and confirmed by confirmPayment
+      // Just register/update user data and show success
       await onSubmit({ ...formData, amount });
     } catch (err) {
+      // Even if onSubmit fails, payment was successful
+      console.warn('Post-payment user update failed:', err);
       setPaymentError(err instanceof Error ? err.message : 'Failed to complete transaction');
     }
   };

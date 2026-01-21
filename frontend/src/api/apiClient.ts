@@ -198,6 +198,9 @@ export const paymentApi = {
 
   resumePayment: (transactionId: string) =>
     apiClient.post<ApiResponse<import('../types').PaymentIntentResponse>>(`/payments/resume/${transactionId}`),
+
+  confirmPayment: (transactionId: string) =>
+    apiClient.post<ApiResponse<{ status: string; message: string }>>(`/payments/confirm/${transactionId}`),
 };
 
 // User endpoints (admin)

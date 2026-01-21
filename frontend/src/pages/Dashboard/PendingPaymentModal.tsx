@@ -27,12 +27,13 @@ const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY || '');
 interface PaymentFormProps {
   clientSecret: string;
   amount: number;
+  transactionId: string;
   onSuccess: () => void;
   onError: (error: string) => void;
 }
 
 // Inner form component that uses Stripe hooks
-const PaymentForm = ({ clientSecret, amount, onSuccess, onError }: PaymentFormProps) => {
+const PaymentForm = ({ clientSecret, amount, transactionId, onSuccess, onError }: PaymentFormProps) => {
   const stripe = useStripe();
   const elements = useElements();
   const [processing, setProcessing] = useState(false);
@@ -67,7 +68,34 @@ const PaymentForm = ({ clientSecret, amount, onSuccess, onError }: PaymentFormPr
         setError(confirmError.message || 'Payment failed');
         onError(confirmError.message || 'Payment failed');
       } else if (paymentIntent && paymentIntent.status === 'succeeded') {
-        onSuccess();
+        // Call backend to confirm and sync transaction data
+        try {
+          const confirmResponse = await paymentApi.confirmPayment(transactionId);
+          if (confirmResponse.data.data.status === 'COMPLETED') {
+            onSuccess();
+          } else if (confirmResponse.data.data.status === 'PROCESSING') {
+            // Payment still processing, wait a bit and try again
+            setError('Payment is processing. Please wait...');
+            setTimeout(async () => {
+              try {
+                const retryResponse = await paymentApi.confirmPayment(transactionId);
+                if (retryResponse.data.data.status === 'COMPLETED') {
+                  onSuccess();
+                } else {
+                  setError('Payment confirmation pending. Please refresh in a moment.');
+                }
+              } catch {
+                onSuccess(); // Proceed anyway, webhook will handle it
+              }
+            }, 2000);
+          } else {
+            setError(confirmResponse.data.data.message || 'Payment confirmation failed');
+          }
+        } catch (confirmErr) {
+          // If confirmation fails, still proceed - webhook will handle it
+          console.warn('Payment confirmation call failed, proceeding anyway:', confirmErr);
+          onSuccess();
+        }
       } else if (paymentIntent && paymentIntent.status === 'requires_action') {
         setError('Additional authentication required. Please complete the verification.');
       } else {
@@ -265,6 +293,7 @@ const PendingPaymentModal = ({
             <PaymentForm
               clientSecret={clientSecret}
               amount={transaction.amount}
+              transactionId={transaction.id}
               onSuccess={handleSuccess}
               onError={handleError}
             />

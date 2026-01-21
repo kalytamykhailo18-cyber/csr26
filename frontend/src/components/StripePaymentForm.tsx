@@ -1,6 +1,6 @@
 // CSR26 Stripe Payment Form Component
 // Handles actual Stripe payment with PaymentElement
-// DATA FLOW: User clicks Pay → Create Payment Intent → Show Stripe Form → Confirm → Webhook → Update Wallet
+// DATA FLOW: User clicks Pay → Create Payment Intent → Show Stripe Form → Confirm → Confirm API → Update Wallet
 
 import { useState, useEffect } from 'react';
 import { loadStripe } from '@stripe/stripe-js';
@@ -22,12 +22,13 @@ const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY || '');
 interface PaymentFormProps {
   clientSecret: string;
   amount: number;
-  onSuccess: () => void;
+  transactionId: string;
+  onSuccess: (transactionId: string) => void;
   onError: (error: string) => void;
 }
 
 // Inner form component that uses Stripe hooks
-const PaymentForm = ({ clientSecret, amount, onSuccess, onError }: PaymentFormProps) => {
+const PaymentForm = ({ clientSecret, amount, transactionId, onSuccess, onError }: PaymentFormProps) => {
   const stripe = useStripe();
   const elements = useElements();
   const [processing, setProcessing] = useState(false);
@@ -62,7 +63,36 @@ const PaymentForm = ({ clientSecret, amount, onSuccess, onError }: PaymentFormPr
         setError(confirmError.message || 'Payment failed');
         onError(confirmError.message || 'Payment failed');
       } else if (paymentIntent && paymentIntent.status === 'succeeded') {
-        onSuccess();
+        // Payment succeeded - confirm with backend to sync data
+        try {
+          const confirmResponse = await paymentApi.confirmPayment(transactionId);
+          if (confirmResponse.data.data.status === 'COMPLETED') {
+            onSuccess(transactionId);
+          } else if (confirmResponse.data.data.status === 'PROCESSING') {
+            // Payment still processing, wait a bit and try again
+            setError('Payment is processing. Please wait...');
+            setTimeout(async () => {
+              try {
+                const retryResponse = await paymentApi.confirmPayment(transactionId);
+                if (retryResponse.data.data.status === 'COMPLETED') {
+                  onSuccess(transactionId);
+                } else {
+                  // Proceed anyway, webhook will handle it
+                  onSuccess(transactionId);
+                }
+              } catch {
+                onSuccess(transactionId); // Proceed anyway, webhook will handle it
+              }
+            }, 2000);
+          } else {
+            // Proceed anyway, webhook will handle it
+            onSuccess(transactionId);
+          }
+        } catch (confirmErr) {
+          // If confirmation fails, still proceed - webhook will handle it
+          console.warn('Payment confirmation call failed, proceeding anyway:', confirmErr);
+          onSuccess(transactionId);
+        }
       } else if (paymentIntent && paymentIntent.status === 'requires_action') {
         // 3D Secure or other action required - Stripe will handle redirect
         setError('Additional authentication required. Please complete the verification.');
@@ -127,7 +157,7 @@ interface StripePaymentFormProps {
   amount: number;
   email: string;
   skuCode?: string;
-  onSuccess: () => void;
+  onSuccess: (transactionId: string) => void;
   onError: (error: string) => void;
   onCancel?: () => void;
 }
@@ -142,6 +172,7 @@ const StripePaymentForm = ({
   onCancel,
 }: StripePaymentFormProps) => {
   const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const [transactionId, setTransactionId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -156,6 +187,7 @@ const StripePaymentForm = ({
           skuCode,
         });
         setClientSecret(response.data.data.clientSecret);
+        setTransactionId(response.data.data.transactionId || '');
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Failed to initialize payment';
         setError(errorMessage);
@@ -197,7 +229,7 @@ const StripePaymentForm = ({
     );
   }
 
-  if (!clientSecret) {
+  if (!clientSecret || !transactionId) {
     return (
       <Alert severity="error">
         Unable to initialize payment. Please try again.
@@ -222,6 +254,7 @@ const StripePaymentForm = ({
       <PaymentForm
         clientSecret={clientSecret}
         amount={amount}
+        transactionId={transactionId}
         onSuccess={onSuccess}
         onError={onError}
       />

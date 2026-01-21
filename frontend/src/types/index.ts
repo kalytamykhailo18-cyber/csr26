@@ -417,6 +417,7 @@ export interface CreatePaymentIntentRequest {
 export interface PaymentIntentResponse {
   clientSecret: string;
   paymentIntentId: string;
+  transactionId?: string; // Returned by createIntent, used for confirmPayment
 }
 
 // ============================================
