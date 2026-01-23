@@ -18,9 +18,6 @@ export const createTransaction = asyncHandler(async (req: Request, res: Response
     throw badRequest('paymentMode is required');
   }
 
-  // Amount can be 0 for weight-based CLAIM products (merchant prepaid)
-  const finalAmount = amount ?? 0;
-
   // Get or create user
   let userId = req.user?.id;
 
@@ -41,15 +38,27 @@ export const createTransaction = asyncHandler(async (req: Request, res: Response
   }
 
   // Calculate impact
+  // For weight-based products (CLAIM/ALLOCATION), calculate from weight
+  // For amount-based (PAY/GIFT_CARD), calculate from amount
   let impact;
+  let transactionAmount: number;
+  let merchantCost: number;
+
   if (weightGrams && weightGrams > 0) {
-    // Weight-based calculation (e-commerce dynamic weight)
-    // Use multiplier if provided, default to 1
+    // Weight-based calculation (supermarket products, e-commerce dynamic weight)
+    // Formula: Impact = Weight (kg) × Multiplier
+    // Merchant cost = Weight (kg) × €0.11 × Multiplier
     const effectiveMultiplier = multiplier && multiplier > 0 ? multiplier : 1;
     impact = await calculateWeightBasedImpact(weightGrams, effectiveMultiplier);
+    // For weight-based, the calculated amount IS the merchant cost
+    transactionAmount = impact.amount;
+    merchantCost = impact.amount;
   } else {
     // Standard calculation (amount-based)
-    impact = await calculateImpact(finalAmount);
+    const inputAmount = amount ?? 0;
+    impact = await calculateImpact(inputAmount);
+    transactionAmount = inputAmount;
+    merchantCost = inputAmount;
   }
 
   // Calculate maturation breakdown
@@ -60,7 +69,7 @@ export const createTransaction = asyncHandler(async (req: Request, res: Response
     data: {
       userId,
       skuCode,
-      amount: finalAmount,
+      amount: transactionAmount,
       impactKg: impact.impactKg,
       paymentMode,
       paymentStatus: paymentMode === 'PAY' ? 'PENDING' : 'COMPLETED',
@@ -93,14 +102,16 @@ export const createTransaction = asyncHandler(async (req: Request, res: Response
 
   // Update wallet if payment is completed (for non-PAY modes)
   if (transaction.paymentStatus === 'COMPLETED') {
-    await updateUserWallet(userId, finalAmount, impact.impactKg);
+    await updateUserWallet(userId, transactionAmount, impact.impactKg);
   }
 
-  // If merchant has monthly billing, add to their balance
-  if (merchantId) {
+  // If merchant, add the merchant cost to their monthly billing balance
+  // For CLAIM mode (merchant prepaid), this is what the merchant owes
+  // For PAY mode, customer already paid, so merchant doesn't owe
+  if (merchantId && (paymentMode === 'CLAIM' || paymentMode === 'ALLOCATION')) {
     await prisma.merchant.update({
       where: { id: merchantId },
-      data: { currentBalance: { increment: finalAmount } },
+      data: { currentBalance: { increment: merchantCost } },
     });
   }
 
