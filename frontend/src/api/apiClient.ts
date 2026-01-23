@@ -234,4 +234,99 @@ export const userApi = {
   },
 };
 
+// Admin endpoints
+export const adminApi = {
+  // Corsair Connect export
+  getCorsairStats: () =>
+    apiClient.get<ApiResponse<{ totalCertified: number; totalExported: number; pendingExport: number; threshold: number }>>('/admin/corsair/stats'),
+
+  exportPendingCorsair: () =>
+    apiClient.post<ApiResponse<{ exportDate: string; recordCount: number; records: unknown[] }>>('/admin/corsair/export-pending'),
+
+  exportAllCorsair: () =>
+    apiClient.post<ApiResponse<{ exportDate: string; recordCount: number; records: unknown[] }>>('/admin/corsair/export-all'),
+
+  getCorsairDownloadUrl: (type: 'pending' | 'all' = 'all') => {
+    const token = localStorage.getItem(TOKEN_KEY);
+    return `${API_BASE_URL}/admin/corsair/download?type=${type}${token ? `&token=${token}` : ''}`;
+  },
+
+  // Reports
+  getMonthlySummary: (params?: { year?: number; month?: number }) =>
+    apiClient.get<ApiResponse<unknown>>('/admin/reports/summary', { params }),
+
+  getRevenueReport: (params?: { startDate?: string; endDate?: string; groupBy?: 'merchant' | 'partner' }) =>
+    apiClient.get<ApiResponse<unknown>>('/admin/reports/revenue', { params }),
+
+  getImpactReport: () =>
+    apiClient.get<ApiResponse<unknown>>('/admin/reports/impact'),
+
+  getUserGrowthReport: (params?: { days?: number }) =>
+    apiClient.get<ApiResponse<unknown>>('/admin/reports/users', { params }),
+
+  // Transaction management
+  getAllTransactions: (params?: {
+    limit?: number;
+    offset?: number;
+    paymentMode?: string;
+    paymentStatus?: string;
+    merchantId?: string;
+    startDate?: string;
+    endDate?: string;
+    search?: string;
+  }) =>
+    apiClient.get<ApiResponse<import('../types').TransactionListResponse>>('/admin/transactions', { params }),
+
+  updateTransactionStatus: (id: string, paymentStatus: 'PENDING' | 'COMPLETED' | 'FAILED') =>
+    apiClient.patch<ApiResponse<import('../types').Transaction>>(`/admin/transactions/${id}`, { paymentStatus }),
+
+  // Admin access
+  verifyAdminAccess: (code: string) =>
+    apiClient.post<ApiResponse<{ message: string; role?: string; valid?: boolean }>>('/admin/access', { code }),
+
+  // Billing
+  getBillingStats: () =>
+    apiClient.get<ApiResponse<unknown>>('/admin/billing/stats'),
+
+  getOutstandingBalances: () =>
+    apiClient.get<ApiResponse<unknown>>('/admin/billing/outstanding'),
+
+  runMonthlyBilling: (params?: { year?: number; month?: number }) =>
+    apiClient.post<ApiResponse<unknown>>('/admin/billing/run', params),
+
+  getInvoice: (id: string) =>
+    apiClient.get<ApiResponse<unknown>>(`/admin/billing/invoices/${id}`),
+
+  payInvoice: (id: string, stripePaymentId?: string) =>
+    apiClient.post<ApiResponse<unknown>>(`/admin/billing/invoices/${id}/pay`, { stripePaymentId }),
+
+  // Cron
+  runDailyCron: () =>
+    apiClient.post<ApiResponse<unknown>>('/admin/cron/daily'),
+
+  runMonthlyCron: () =>
+    apiClient.post<ApiResponse<unknown>>('/admin/cron/monthly'),
+
+  runAllCron: () =>
+    apiClient.post<ApiResponse<unknown>>('/admin/cron/all'),
+};
+
+// Merchant self-service endpoints
+export const merchantSelfServiceApi = {
+  getCurrentMerchant: () =>
+    apiClient.get<ApiResponse<unknown>>('/merchants/me'),
+
+  getMyTransactions: (params?: { limit?: number; offset?: number; dateFrom?: string; dateTo?: string }) =>
+    apiClient.get<ApiResponse<import('../types').TransactionListResponse>>('/merchants/me/transactions', { params }),
+
+  getMyBilling: () =>
+    apiClient.get<ApiResponse<import('../types').MerchantBillingInfo>>('/merchants/me/billing'),
+
+  getMyInvoice: (invoiceId: string) =>
+    apiClient.get<ApiResponse<unknown>>(`/merchants/me/invoices/${invoiceId}`),
+
+  getMySKUs: () =>
+    apiClient.get<ApiResponse<import('../types').Sku[]>>('/merchants/me/skus'),
+};
+
 export default apiClient;

@@ -8,6 +8,7 @@ import giftCodeRoutes from './giftCodeRoutes.js';
 import merchantRoutes from './merchantRoutes.js';
 import paymentRoutes from './paymentRoutes.js';
 import userRoutes from './userRoutes.js';
+import adminRoutes from './adminRoutes.js';
 
 const router = Router();
 
@@ -21,5 +22,6 @@ router.use('/gift-codes', giftCodeRoutes);
 router.use('/merchants', merchantRoutes);
 router.use('/payments', paymentRoutes);
 router.use('/users', userRoutes);
+router.use('/admin', adminRoutes);
 
 export default router;

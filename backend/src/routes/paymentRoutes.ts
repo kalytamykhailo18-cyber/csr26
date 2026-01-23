@@ -1,7 +1,6 @@
 import { Router } from 'express';
 import * as paymentController from '../controllers/paymentController.js';
 import { optionalAuth, authenticate } from '../middleware/auth.js';
-import express from 'express';
 
 const router = Router();
 
@@ -14,12 +13,7 @@ router.post('/resume/:transactionId', authenticate, paymentController.resumePaym
 // POST /api/payments/confirm/:transactionId - Confirm payment and sync data after Stripe success
 router.post('/confirm/:transactionId', authenticate, paymentController.confirmPayment);
 
-// POST /api/payments/webhook - Stripe webhook handler
-// Note: This needs raw body, not JSON parsed
-router.post(
-  '/webhook',
-  express.raw({ type: 'application/json' }),
-  paymentController.handleWebhook
-);
+// NOTE: Webhook route is registered in app.ts BEFORE json middleware
+// to ensure Stripe signature verification works with raw body
 
 export default router;

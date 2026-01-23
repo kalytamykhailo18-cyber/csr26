@@ -2,6 +2,7 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import routes from './routes/index.js';
+import { handleWebhook } from './controllers/paymentController.js';
 import { errorHandler } from './middleware/errorHandler.js';
 
 const app = express();
@@ -16,7 +17,11 @@ app.use(cors({
   credentials: true,
 }));
 
-// Body parsing
+// CRITICAL: Stripe webhook must be registered BEFORE express.json() middleware
+// Stripe requires raw body for signature verification
+app.post('/api/payments/webhook', express.raw({ type: 'application/json' }), handleWebhook);
+
+// Body parsing (AFTER webhook route)
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 

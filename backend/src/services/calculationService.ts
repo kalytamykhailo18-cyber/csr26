@@ -1,5 +1,6 @@
 import { prisma } from '../lib/prisma.js';
 import type { ImpactCalculation, MaturationBreakdown, UserImpactSummary } from '../types/index.js';
+import { exportUserToCorsair } from './corsairService.js';
 
 // ============================================
 // MATURATION CONSTANTS (5/45/50 Rule)
@@ -283,6 +284,15 @@ export const checkThresholdUpgrade = async (userId: string): Promise<boolean> =>
       where: { id: userId },
       data: { status: 'CERTIFIED' },
     });
+
+    // Trigger Corsair Connect export for newly certified user
+    try {
+      await exportUserToCorsair(userId);
+    } catch (error) {
+      // Log error but don't fail the upgrade
+      console.error(`[Corsair Export] Failed to export user ${userId}:`, error);
+    }
+
     return true;
   }
 

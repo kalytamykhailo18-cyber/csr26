@@ -1,16 +1,25 @@
 import { Request, Response, NextFunction } from 'express';
-import { asyncHandler, badRequest, notFound } from '../middleware/errorHandler.js';
+import { asyncHandler, badRequest, notFound, forbidden } from '../middleware/errorHandler.js';
 import { prisma } from '../lib/prisma.js';
 import type { ApiResponse, Merchant, MerchantSummary, MerchantBillingInfo } from '../types/index.js';
 
+// Helper to get merchant for current user (by email match)
+const getMerchantForUser = async (userEmail: string): Promise<Merchant | null> => {
+  return prisma.merchant.findUnique({
+    where: { email: userEmail },
+  });
+};
+
 // Helper to check merchant access
-const checkMerchantAccess = (req: Request, _merchantId: string): void => {
+const checkMerchantAccess = async (req: Request, merchantId: string): Promise<void> => {
   // Admin can access any merchant
   if (req.user!.role === 'ADMIN') return;
 
-  // Merchants can only access their own data
-  // TODO: Link user to merchant properly
-  // For now, this is a placeholder check
+  // Merchants can only access their own data (matched by email)
+  const userMerchant = await getMerchantForUser(req.user!.email);
+  if (!userMerchant || userMerchant.id !== merchantId) {
+    throw forbidden('Access denied to this merchant');
+  }
 };
 
 // GET /api/merchants - List all merchants (admin only)
@@ -32,11 +41,74 @@ export const getAllMerchants = asyncHandler(async (_req: Request, res: Response,
   res.json(response);
 });
 
+// GET /api/merchants/me - Get current merchant (self-service)
+export const getCurrentMerchant = asyncHandler(async (req: Request, res: Response, _next: NextFunction) => {
+  const userEmail = req.user!.email;
+
+  const merchant = await getMerchantForUser(userEmail);
+
+  if (!merchant) {
+    throw notFound('No merchant account linked to this email');
+  }
+
+  // Calculate totals
+  const totals = await prisma.transaction.aggregate({
+    where: { merchantId: merchant.id, paymentStatus: 'COMPLETED' },
+    _sum: { impactKg: true, amount: true },
+    _count: true,
+  });
+
+  // Get this month's transactions count
+  const startOfMonth = new Date();
+  startOfMonth.setDate(1);
+  startOfMonth.setHours(0, 0, 0, 0);
+
+  const monthlyTransactions = await prisma.transaction.count({
+    where: {
+      merchantId: merchant.id,
+      createdAt: { gte: startOfMonth },
+    },
+  });
+
+  // Get pending invoices
+  const pendingInvoices = await prisma.invoice.count({
+    where: { merchantId: merchant.id, paid: false },
+  });
+
+  const dashboard = {
+    merchant: {
+      id: merchant.id,
+      name: merchant.name,
+      email: merchant.email,
+      multiplier: merchant.multiplier,
+      monthlyBilling: merchant.monthlyBilling,
+    },
+    stats: {
+      totalTransactions: totals._count ?? 0,
+      totalImpactKg: Number(totals._sum?.impactKg || 0),
+      totalRevenue: Number(totals._sum?.amount || 0),
+      monthlyTransactions,
+      currentBalance: Number(merchant.currentBalance),
+      pendingInvoices,
+    },
+    nextBillingDate: merchant.lastBillingDate
+      ? new Date(new Date(merchant.lastBillingDate).setMonth(new Date(merchant.lastBillingDate).getMonth() + 1))
+      : new Date(new Date().setMonth(new Date().getMonth() + 1)),
+  };
+
+  const response: ApiResponse<typeof dashboard> = {
+    success: true,
+    data: dashboard,
+  };
+
+  res.json(response);
+});
+
 // GET /api/merchants/:id - Get merchant by ID
 export const getMerchant = asyncHandler(async (req: Request, res: Response, _next: NextFunction) => {
   const id = req.params.id as string;
   if (!id) throw badRequest('Merchant ID is required');
-  checkMerchantAccess(req, id);
+  await checkMerchantAccess(req, id);
 
   const merchant = await prisma.merchant.findUnique({
     where: { id },
@@ -83,7 +155,7 @@ export const getMerchantTransactions = asyncHandler(async (req: Request, res: Re
   const id = req.params.id as string;
   if (!id) throw badRequest('Merchant ID is required');
   const { limit = '50', offset = '0', dateFrom, dateTo } = req.query;
-  checkMerchantAccess(req, id);
+  await checkMerchantAccess(req, id);
 
   // Build date filter if provided
   const dateFilter: { createdAt?: { gte?: Date; lte?: Date } } = {};
@@ -129,7 +201,7 @@ export const getMerchantTransactions = asyncHandler(async (req: Request, res: Re
 export const getMerchantBilling = asyncHandler(async (req: Request, res: Response, _next: NextFunction) => {
   const id = req.params.id as string;
   if (!id) throw badRequest('Merchant ID is required');
-  checkMerchantAccess(req, id);
+  await checkMerchantAccess(req, id);
 
   const merchant = await prisma.merchant.findUnique({
     where: { id },
@@ -228,6 +300,182 @@ export const updateMerchant = asyncHandler(async (req: Request, res: Response, _
   const response: ApiResponse<Merchant> = {
     success: true,
     data: merchant,
+  };
+
+  res.json(response);
+});
+
+// ============================================
+// MERCHANT SELF-SERVICE ENDPOINTS
+// ============================================
+
+// GET /api/merchants/me/transactions - Get current merchant's transactions
+export const getMyTransactions = asyncHandler(async (req: Request, res: Response, _next: NextFunction) => {
+  const userEmail = req.user!.email;
+  const limitStr = String(req.query.limit || '50');
+  const offsetStr = String(req.query.offset || '0');
+  const dateFrom = req.query.dateFrom ? String(req.query.dateFrom) : undefined;
+  const dateTo = req.query.dateTo ? String(req.query.dateTo) : undefined;
+
+  const merchant = await getMerchantForUser(userEmail);
+  if (!merchant) {
+    throw notFound('No merchant account linked to this email');
+  }
+
+  // Build date filter if provided
+  const dateFilter: { createdAt?: { gte?: Date; lte?: Date } } = {};
+  if (dateFrom || dateTo) {
+    dateFilter.createdAt = {};
+    if (dateFrom) {
+      dateFilter.createdAt.gte = new Date(dateFrom);
+    }
+    if (dateTo) {
+      const endDate = new Date(dateTo);
+      endDate.setHours(23, 59, 59, 999);
+      dateFilter.createdAt.lte = endDate;
+    }
+  }
+
+  const [transactions, total] = await Promise.all([
+    prisma.transaction.findMany({
+      where: { merchantId: merchant.id, ...dateFilter },
+      include: {
+        user: {
+          select: { id: true, email: true, firstName: true, lastName: true },
+        },
+        sku: {
+          select: { code: true, name: true },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: parseInt(limitStr),
+      skip: parseInt(offsetStr),
+    }),
+    prisma.transaction.count({ where: { merchantId: merchant.id, ...dateFilter } }),
+  ]);
+
+  const response: ApiResponse<{ transactions: typeof transactions; total: number }> = {
+    success: true,
+    data: { transactions, total },
+  };
+
+  res.json(response);
+});
+
+// GET /api/merchants/me/billing - Get current merchant's billing info
+export const getMyBilling = asyncHandler(async (req: Request, res: Response, _next: NextFunction) => {
+  const userEmail = req.user!.email;
+
+  const merchant = await getMerchantForUser(userEmail);
+  if (!merchant) {
+    throw notFound('No merchant account linked to this email');
+  }
+
+  // Get pending transactions this month
+  const startOfMonth = new Date();
+  startOfMonth.setDate(1);
+  startOfMonth.setHours(0, 0, 0, 0);
+
+  const pendingCount = await prisma.transaction.count({
+    where: {
+      merchantId: merchant.id,
+      createdAt: { gte: startOfMonth },
+    },
+  });
+
+  // Get invoices
+  const invoices = await prisma.invoice.findMany({
+    where: { merchantId: merchant.id },
+    orderBy: { createdAt: 'desc' },
+    take: 12,
+  });
+
+  const billingInfo: MerchantBillingInfo = {
+    currentBalance: Number(merchant.currentBalance),
+    pendingTransactions: pendingCount,
+    nextBillingDate: merchant.lastBillingDate
+      ? new Date(new Date(merchant.lastBillingDate).setMonth(new Date(merchant.lastBillingDate).getMonth() + 1))
+      : new Date(new Date().setMonth(new Date().getMonth() + 1)),
+    lastBillingDate: merchant.lastBillingDate,
+    invoices,
+  };
+
+  const response: ApiResponse<MerchantBillingInfo> = {
+    success: true,
+    data: billingInfo,
+  };
+
+  res.json(response);
+});
+
+// GET /api/merchants/me/invoices/:invoiceId - Get invoice details
+export const getMyInvoice = asyncHandler(async (req: Request, res: Response, _next: NextFunction) => {
+  const userEmail = req.user!.email;
+  const invoiceId = req.params.invoiceId;
+
+  if (!invoiceId) throw badRequest('Invoice ID is required');
+
+  const merchant = await getMerchantForUser(userEmail);
+  if (!merchant) {
+    throw notFound('No merchant account linked to this email');
+  }
+
+  const invoice = await prisma.invoice.findUnique({
+    where: { id: String(invoiceId) },
+  });
+
+  if (!invoice || invoice.merchantId !== merchant.id) {
+    throw notFound('Invoice not found');
+  }
+
+  // Get transactions for the invoice period
+  const transactions = await prisma.transaction.findMany({
+    where: {
+      merchantId: merchant.id,
+      createdAt: { gte: invoice.periodStart, lte: invoice.periodEnd },
+      paymentStatus: 'COMPLETED',
+      paymentMode: { in: ['CLAIM', 'ALLOCATION'] },
+    },
+    select: {
+      id: true,
+      amount: true,
+      impactKg: true,
+      paymentMode: true,
+      createdAt: true,
+      user: {
+        select: { email: true, firstName: true, lastName: true },
+      },
+    },
+  });
+
+  const response: ApiResponse<{
+    invoice: typeof invoice;
+    transactions: typeof transactions;
+  }> = {
+    success: true,
+    data: { invoice, transactions },
+  };
+
+  res.json(response);
+});
+
+// GET /api/merchants/me/skus - Get merchant's SKU configurations
+export const getMySKUs = asyncHandler(async (req: Request, res: Response, _next: NextFunction) => {
+  const userEmail = req.user!.email;
+
+  const merchant = await getMerchantForUser(userEmail);
+  if (!merchant) {
+    throw notFound('No merchant account linked to this email');
+  }
+
+  const skus = await prisma.sku.findMany({
+    where: { merchantId: merchant.id },
+    orderBy: { createdAt: 'desc' },
+  });
+
+  const response: ApiResponse<typeof skus> = {
+    success: true,
+    data: skus,
   };
 
   res.json(response);

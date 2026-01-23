@@ -96,6 +96,16 @@ export const sendMagicLink = asyncHandler(async (req: Request, res: Response, _n
     },
   });
 
+  // LOG MAGIC LINK FOR PM2 LOGS
+  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+  console.log('========================================');
+  console.log('MAGIC LINK GENERATED');
+  console.log('Email:', email);
+  console.log('Token:', token);
+  console.log('URL:', `${frontendUrl}/auth/verify/${token}`);
+  console.log('Expires:', expiresAt.toISOString());
+  console.log('========================================');
+
   // Send magic link email (uses nodemailer if configured, or logs to console in development)
   const emailResult = await sendMagicLinkEmail(
     user.email,
