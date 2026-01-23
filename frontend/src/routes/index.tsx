@@ -16,6 +16,9 @@ import LoginPage from '../pages/Login';
 import VerifyPage from '../pages/Verify';
 import TermsPage from '../pages/Terms';
 import PrivacyPage from '../pages/Privacy';
+import PartnerLoginPage from '../pages/PartnerLogin';
+import PartnerVerifyPage from '../pages/PartnerVerify';
+import PartnerDashboardPage from '../pages/PartnerDashboard';
 
 // Not Found component
 const NotFound = () => {
@@ -85,6 +88,11 @@ const AppRoutes = () => {
       <Route path="/auth/verify/:token" element={<VerifyPage />} />
       <Route path="/terms" element={<TermsPage />} />
       <Route path="/privacy" element={<PrivacyPage />} />
+
+      {/* Partner routes (separate auth system) */}
+      <Route path="/partner/login" element={<PartnerLoginPage />} />
+      <Route path="/partner/verify/:token" element={<PartnerVerifyPage />} />
+      <Route path="/partner" element={<PartnerDashboardPage />} />
 
       {/* Protected user routes */}
       <Route

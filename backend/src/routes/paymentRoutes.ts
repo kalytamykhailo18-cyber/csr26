@@ -11,7 +11,8 @@ router.post('/create-intent', optionalAuth, paymentController.createPaymentInten
 router.post('/resume/:transactionId', authenticate, paymentController.resumePayment);
 
 // POST /api/payments/confirm/:transactionId - Confirm payment and sync data after Stripe success
-router.post('/confirm/:transactionId', authenticate, paymentController.confirmPayment);
+// Uses optionalAuth - if user is authenticated, validates ownership; otherwise trusts the transactionId
+router.post('/confirm/:transactionId', optionalAuth, paymentController.confirmPayment);
 
 // NOTE: Webhook route is registered in app.ts BEFORE json middleware
 // to ensure Stripe signature verification works with raw body

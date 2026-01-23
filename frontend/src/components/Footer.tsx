@@ -20,6 +20,10 @@ const Footer = ({ className = '' }: FooterProps) => {
     goTo('/terms');
   };
 
+  const handlePartnerPortalClick = () => {
+    goTo('/partner/login');
+  };
+
   return (
     <footer className={`w-full bg-gray-900 py-8 px-4 md:px-8 ${className}`}>
       <div className="max-w-4xl mx-auto">
@@ -70,6 +74,14 @@ const Footer = ({ className = '' }: FooterProps) => {
             className="text-sm text-gray-400 hover:text-white hover:underline transition-colors"
           >
             Terms and Conditions
+          </button>
+          <span className="text-gray-600">|</span>
+          <button
+            type="button"
+            onClick={handlePartnerPortalClick}
+            className="text-sm text-gray-400 hover:text-white hover:underline transition-colors"
+          >
+            Partner Portal
           </button>
         </div>
 

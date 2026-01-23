@@ -1,11 +1,9 @@
-// CSR26 Login Page
-// Allows returning users to request magic link for authentication
-// DATA FLOW: Component → dispatch sendMagicLink → Redux → API → Response → UI
+// CSR26 Partner Login Page
+// Allows partners to request magic link for authentication
 
 import { useState, useEffect } from 'react';
-import { useAppDispatch, useAppSelector } from '../../store/hooks';
-import { sendMagicLink, clearAuthError, resetMagicLinkStatus } from '../../store/slices/authSlice';
-import { useNavigation } from '../../hooks/useNavigation';
+import { useNavigate } from 'react-router-dom';
+import { partnerApi, getPartnerToken } from '../../api/apiClient';
 import Navigation from '../../components/Navigation';
 import Footer from '../../components/Footer';
 import LoadingSpinner from '../../components/LoadingSpinner';
@@ -13,33 +11,23 @@ import TextField from '@mui/material/TextField';
 import Button from '@mui/material/Button';
 import Alert from '@mui/material/Alert';
 
-const Login = () => {
-  const dispatch = useAppDispatch();
-  const { goToLanding, goToDashboard, goTo } = useNavigation();
+const PartnerLogin = () => {
+  const navigate = useNavigate();
 
   // Local state
   const [email, setEmail] = useState('');
   const [emailError, setEmailError] = useState('');
-
-  // Redux state
-  const { isAuthenticated, loading, error, magicLinkSent } = useAppSelector(
-    (state) => state.auth
-  );
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [magicLinkSent, setMagicLinkSent] = useState(false);
 
   // Redirect if already authenticated
   useEffect(() => {
-    if (isAuthenticated) {
-      goToDashboard();
+    const token = getPartnerToken();
+    if (token) {
+      navigate('/partner');
     }
-  }, [isAuthenticated, goToDashboard]);
-
-  // Clear errors and status on unmount
-  useEffect(() => {
-    return () => {
-      dispatch(clearAuthError());
-      dispatch(resetMagicLinkStatus());
-    };
-  }, [dispatch]);
+  }, [navigate]);
 
   // Validate email format
   const validateEmail = (email: string): boolean => {
@@ -51,6 +39,7 @@ const Login = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setEmailError('');
+    setError('');
 
     // Validate email
     if (!email.trim()) {
@@ -62,31 +51,31 @@ const Login = () => {
       return;
     }
 
-    // Dispatch sendMagicLink action
-    dispatch(sendMagicLink(email.trim()));
-  };
-
-  // Handle go to landing
-  const handleGoToLanding = () => {
-    goToLanding();
+    setLoading(true);
+    try {
+      await partnerApi.sendMagicLink(email.trim());
+      setMagicLinkSent(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to send magic link');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50 pt-14">
-      {/* Navigation */}
       <Navigation />
 
-      {/* Main Content */}
       <main className="flex-1 flex items-center justify-center px-4 py-8">
         <div className="w-full max-w-md">
           <div className="bg-white rounded-md shadow-sm border border-gray-200 p-8 animate-fade-up-normal">
             {/* Title */}
             <div className="text-center mb-8">
               <h1 className="text-2xl font-bold text-gray-800 mb-2">
-                Welcome Back
+                Partner Portal
               </h1>
               <p className="text-gray-600">
-                Enter your email to receive a secure login link.
+                Enter your email to access your partner dashboard.
               </p>
             </div>
 
@@ -98,7 +87,7 @@ const Login = () => {
                     <strong>Check your email!</strong>
                     <p className="mt-1 text-sm">
                       We've sent a login link to <strong>{email}</strong>.
-                      Click the link in the email to access your dashboard.
+                      Click the link in the email to access your partner dashboard.
                     </p>
                   </div>
                 </Alert>
@@ -108,7 +97,7 @@ const Login = () => {
                 <Button
                   fullWidth
                   variant="outlined"
-                  onClick={() => dispatch(resetMagicLinkStatus())}
+                  onClick={() => setMagicLinkSent(false)}
                   sx={{ textTransform: 'none' }}
                 >
                   Send Another Link
@@ -128,7 +117,7 @@ const Login = () => {
                 <div className="mb-6">
                   <TextField
                     fullWidth
-                    label="Email Address"
+                    label="Partner Email"
                     type="email"
                     value={email}
                     onChange={(e) => {
@@ -140,7 +129,7 @@ const Login = () => {
                     disabled={loading}
                     autoComplete="email"
                     autoFocus
-                    placeholder="your@email.com"
+                    placeholder="partner@company.com"
                   />
                 </div>
 
@@ -169,58 +158,20 @@ const Login = () => {
               </form>
             )}
 
-            {/* Divider */}
-            <div className="relative my-8">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-200"></div>
-              </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="px-4 bg-white text-gray-500">
-                  New to CSR26?
-                </span>
-              </div>
-            </div>
-
-            {/* Register CTA */}
-            <div className="text-center">
-              <p className="text-gray-600 mb-4">
-                Start building your environmental portfolio today.
+            {/* Info */}
+            <div className="mt-6 text-center text-sm text-gray-500">
+              <p>
+                This portal is for registered CSR26 distribution partners.
+                Contact your administrator if you need access.
               </p>
-              <Button
-                fullWidth
-                variant="outlined"
-                onClick={handleGoToLanding}
-                sx={{ textTransform: 'none' }}
-              >
-                Get Started
-              </Button>
             </div>
-          </div>
-
-          {/* Additional Info */}
-          <div className="mt-6 text-center text-sm text-gray-500">
-            <p>
-              We use passwordless login for your security.
-              A secure link will be sent to your email.
-            </p>
-          </div>
-
-          {/* Partner Portal Link */}
-          <div className="mt-4 text-center">
-            <button
-              onClick={() => goTo('/partner/login')}
-              className="text-sm text-blue-600 hover:text-blue-800 hover:underline"
-            >
-              Are you a partner? Access Partner Portal
-            </button>
           </div>
         </div>
       </main>
 
-      {/* Footer */}
       <Footer />
     </div>
   );
 };
 
-export default Login;
+export default PartnerLogin;

@@ -185,6 +185,7 @@ export const resumePayment = asyncHandler(async (req: Request, res: Response, _n
 
 // POST /api/payments/confirm/:transactionId - Confirm payment and sync data
 // Called by frontend after Stripe confirms payment to ensure data is synced
+// Uses optionalAuth - validates ownership if authenticated, otherwise just confirms by transactionId
 export const confirmPayment = asyncHandler(async (req: Request, res: Response, _next: NextFunction) => {
   if (!stripe) {
     throw internalError('Stripe not configured');
@@ -193,16 +194,11 @@ export const confirmPayment = asyncHandler(async (req: Request, res: Response, _
   const { transactionId } = req.params;
   const userId = req.user?.id;
 
-  if (!userId) {
-    throw badRequest('Authentication required');
-  }
-
-  // Find the transaction
+  // Find the transaction - if user is authenticated, validate ownership
   const transaction = await prisma.transaction.findFirst({
-    where: {
-      id: String(transactionId),
-      userId: String(userId),
-    },
+    where: userId
+      ? { id: String(transactionId), userId: String(userId) }
+      : { id: String(transactionId) },
   });
 
   if (!transaction) {

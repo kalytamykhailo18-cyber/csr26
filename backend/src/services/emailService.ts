@@ -158,9 +158,12 @@ Certified by Control Union | CPRS Protocol Verified
 export const sendMagicLinkEmail = async (
   email: string,
   token: string,
-  userName?: string
+  userName?: string,
+  type: 'user' | 'partner' = 'user'
 ): Promise<{ success: boolean; message: string; magicLinkUrl?: string }> => {
-  const magicLinkUrl = `${frontendUrl}/verify/${token}`;
+  // Use different paths for user vs partner magic links
+  const verifyPath = type === 'partner' ? '/partner/verify' : '/auth/verify';
+  const magicLinkUrl = `${frontendUrl}${verifyPath}/${token}`;
 
   // Check if we should send email - send if SMTP is configured (regardless of NODE_ENV)
   const shouldSendEmail = isEmailConfigured();

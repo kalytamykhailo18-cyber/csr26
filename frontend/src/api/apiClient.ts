@@ -329,4 +329,145 @@ export const merchantSelfServiceApi = {
     apiClient.get<ApiResponse<import('../types').Sku[]>>('/merchants/me/skus'),
 };
 
+// Partner endpoints
+// Uses separate token storage to avoid conflicts with user auth
+const PARTNER_TOKEN_KEY = 'csr26_partner_token';
+
+export const setPartnerToken = (token: string): void => {
+  localStorage.setItem(PARTNER_TOKEN_KEY, token);
+};
+
+export const getPartnerToken = (): string | null => {
+  return localStorage.getItem(PARTNER_TOKEN_KEY);
+};
+
+export const clearPartnerToken = (): void => {
+  localStorage.removeItem(PARTNER_TOKEN_KEY);
+};
+
+// Create a separate axios instance for partner API calls
+const partnerClient = axios.create({
+  baseURL: API_BASE_URL,
+  timeout: 30000,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+// Partner request interceptor - use partner token
+partnerClient.interceptors.request.use(
+  (config: InternalAxiosRequestConfig) => {
+    const token = localStorage.getItem(PARTNER_TOKEN_KEY);
+    if (token && config.headers) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
+// Partner response interceptor
+partnerClient.interceptors.response.use(
+  (response: AxiosResponse) => {
+    return response;
+  },
+  (error: AxiosError<ApiErrorResponse>) => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem(PARTNER_TOKEN_KEY);
+    }
+    const errorMessage = error.response?.data?.error?.message
+      || error.message
+      || 'An unexpected error occurred';
+    return Promise.reject(new Error(errorMessage));
+  }
+);
+
+export const partnerApi = {
+  // Auth
+  sendMagicLink: (email: string) =>
+    apiClient.post<ApiResponse<{ message: string }>>('/partners/auth/magic-link', { email }),
+
+  verifyToken: (token: string) =>
+    apiClient.get<ApiResponse<{
+      partner: { id: string; name: string; email: string };
+      token: string;
+    }>>(`/partners/auth/verify/${token}`),
+
+  // Dashboard (uses partner token)
+  getDashboard: () =>
+    partnerClient.get<ApiResponse<{
+      partner: {
+        id: string;
+        name: string;
+        email: string;
+        contactPerson: string | null;
+        commissionRate: number;
+        active: boolean;
+      };
+      merchants: Array<{
+        id: string;
+        name: string;
+        email: string;
+        multiplier: number;
+        currentBalance: number;
+        transactionCount: number;
+      }>;
+      stats: {
+        totalMerchants: number;
+        totalTransactions: number;
+        totalRevenue: number;
+        totalImpactKg: number;
+        monthlyTransactions: number;
+        monthlyRevenue: number;
+        monthlyImpactKg: number;
+      };
+    }>>('/partners/me'),
+
+  getMerchants: () =>
+    partnerClient.get<ApiResponse<Array<{
+      id: string;
+      name: string;
+      email: string;
+      multiplier: number;
+      monthlyBilling: boolean;
+      currentBalance: number;
+      transactionCount: number;
+      skuCount: number;
+      totalRevenue: number;
+      totalImpactKg: number;
+      createdAt: string;
+    }>>>('/partners/me/merchants'),
+
+  getTransactions: (params?: { limit?: number; offset?: number; merchantId?: string }) =>
+    partnerClient.get<ApiResponse<{
+      transactions: Array<{
+        id: string;
+        amount: number;
+        impactKg: number;
+        paymentMode: string;
+        paymentStatus: string;
+        createdAt: string;
+        user: { email: string; firstName: string | null; lastName: string | null } | null;
+        merchant: { name: string } | null;
+        sku: { code: string; name: string } | null;
+      }>;
+      total: number;
+    }>>('/partners/me/transactions', { params }),
+
+  getSummaryReport: (params?: { year?: number; month?: number }) =>
+    partnerClient.get<ApiResponse<{
+      period: { year: number; month: number; startDate: string; endDate: string };
+      totals: {
+        transactions: number;
+        revenue: number;
+        impactKg: number;
+        estimatedCommission: number;
+      };
+      byMerchant: Array<{ id: string; name: string; count: number; revenue: number; impactKg: number }>;
+      byPaymentMode: Record<string, { count: number; revenue: number; impactKg: number }>;
+    }>>('/partners/me/reports/summary', { params }),
+};
+
 export default apiClient;

@@ -9,6 +9,7 @@ import merchantRoutes from './merchantRoutes.js';
 import paymentRoutes from './paymentRoutes.js';
 import userRoutes from './userRoutes.js';
 import adminRoutes from './adminRoutes.js';
+import partnerRoutes from './partnerRoutes.js';
 
 const router = Router();
 
@@ -23,5 +24,6 @@ router.use('/merchants', merchantRoutes);
 router.use('/payments', paymentRoutes);
 router.use('/users', userRoutes);
 router.use('/admin', adminRoutes);
+router.use('/partners', partnerRoutes);
 
 export default router;

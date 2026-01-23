@@ -199,6 +199,50 @@ model GiftCode {
   @@index([status])
 }
 
+// Partner - Distribution partners who manage merchants
+model Partner {
+  id                String      @id @default(uuid())
+  name              String
+  email             String      @unique
+  contactPerson     String?
+
+  // Commission settings
+  commissionRate    Decimal     @default(0) @db.Decimal(5, 2)  // Percentage commission
+
+  // Status
+  active            Boolean     @default(true)
+
+  // Timestamps
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  // Relations
+  merchants         Merchant[]
+  magicLinks        PartnerMagicLink[]
+
+  @@index([email])
+}
+
+// PartnerMagicLink - Passwordless authentication for partners
+model PartnerMagicLink {
+  id          String    @id @default(uuid())
+  partnerId   String
+  token       String    @unique
+
+  // Expiration
+  expiresAt   DateTime
+  used        Boolean   @default(false)
+
+  // Timestamps
+  createdAt   DateTime  @default(now())
+
+  // Relations
+  partner     Partner   @relation(fields: [partnerId], references: [id])
+
+  @@index([token])
+  @@index([partnerId])
+}
+
 // Merchant - Business partners
 model Merchant {
   id                String      @id @default(uuid())
@@ -217,7 +261,7 @@ model Merchant {
   // Stripe Connect
   stripeAccountId   String?
 
-  // Attribution
+  // Attribution - linked to Partner
   partnerId         String?
 
   // Timestamps
@@ -228,6 +272,7 @@ model Merchant {
   transactions      Transaction[]
   skus              Sku[]
   invoices          Invoice[]
+  partner           Partner?    @relation(fields: [partnerId], references: [id])
 
   @@index([email])
   @@index([partnerId])

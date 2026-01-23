@@ -177,6 +177,8 @@ const StripePaymentForm = ({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
+
     const createIntent = async () => {
       try {
         setLoading(true);
@@ -186,21 +188,32 @@ const StripePaymentForm = ({
           email,
           skuCode,
         });
-        setClientSecret(response.data.data.clientSecret);
-        setTransactionId(response.data.data.transactionId || '');
+        if (!cancelled) {
+          setClientSecret(response.data.data.clientSecret);
+          setTransactionId(response.data.data.transactionId || '');
+        }
       } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : 'Failed to initialize payment';
-        setError(errorMessage);
-        onError(errorMessage);
+        if (!cancelled) {
+          const errorMessage = err instanceof Error ? err.message : 'Failed to initialize payment';
+          setError(errorMessage);
+          onError(errorMessage);
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
     };
 
     if (amount > 0 && email) {
       createIntent();
     }
-  }, [amount, email, skuCode, onError]);
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [amount, email, skuCode]); // Removed onError to prevent re-initialization
 
   if (loading) {
     return (
@@ -239,6 +252,7 @@ const StripePaymentForm = ({
 
   return (
     <Elements
+      key={clientSecret} // Force remount with new clientSecret
       stripe={stripePromise}
       options={{
         clientSecret,

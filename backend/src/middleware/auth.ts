@@ -151,3 +151,38 @@ export const adminOnly = authorize('ADMIN');
 
 // Merchant or Admin middleware
 export const merchantOrAdmin = authorize('MERCHANT', 'ADMIN');
+
+// Partner authentication middleware
+export const authenticatePartner = async (
+  req: Request,
+  _res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      throw unauthorized('No token provided');
+    }
+
+    const token = authHeader.substring(7);
+    const payload = jwt.verify(token, JWT_SECRET) as { partnerId: string; email: string; type: string };
+
+    if (payload.type !== 'partner') {
+      throw unauthorized('Invalid token type');
+    }
+
+    // Attach partner ID to request
+    (req as any).partnerId = payload.partnerId;
+    (req as any).partnerEmail = payload.email;
+
+    next();
+  } catch (error) {
+    if (error instanceof jwt.JsonWebTokenError) {
+      next(unauthorized('Invalid token'));
+    } else if (error instanceof jwt.TokenExpiredError) {
+      next(unauthorized('Token expired'));
+    } else {
+      next(error);
+    }
+  }
+};
