@@ -265,6 +265,8 @@ export const calculateWeightBasedImpact = async (
 // ============================================
 
 // Check if user should be upgraded to CERTIFIED status
+// CRITICAL: Validates that COMPLETED transactions exist (not just wallet balance)
+// This prevents certification from manual balance manipulation
 export const checkThresholdUpgrade = async (userId: string): Promise<boolean> => {
   const user = await prisma.user.findUnique({
     where: { id: userId },
@@ -279,6 +281,28 @@ export const checkThresholdUpgrade = async (userId: string): Promise<boolean> =>
   const balance = Number(user.walletBalance);
 
   if (balance >= threshold) {
+    // VALIDATION: Verify that completed transactions actually exist
+    // This prevents certification from manual balance manipulation without real transactions
+    const completedTransactionsSum = await prisma.transaction.aggregate({
+      where: {
+        userId,
+        paymentStatus: 'COMPLETED',
+      },
+      _sum: {
+        amount: true,
+      },
+    });
+
+    const actualTransactionTotal = Number(completedTransactionsSum._sum.amount || 0);
+
+    // Only certify if actual completed transaction amounts meet threshold
+    if (actualTransactionTotal < threshold) {
+      console.warn(
+        `[Threshold Check] User ${userId} has walletBalance €${balance.toFixed(2)} but only €${actualTransactionTotal.toFixed(2)} in completed transactions. Skipping certification.`
+      );
+      return false;
+    }
+
     // Upgrade user to CERTIFIED
     await prisma.user.update({
       where: { id: userId },

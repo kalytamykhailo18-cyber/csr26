@@ -290,23 +290,33 @@ export const handleWebhook = async (req: Request, res: Response, _next: NextFunc
       const paymentIntent = event.data.object as Stripe.PaymentIntent;
       console.log('Payment succeeded:', paymentIntent.id);
 
-      // Update transaction
+      // Find transaction for this payment intent
       const transaction = await prisma.transaction.findFirst({
         where: { stripePaymentId: paymentIntent.id },
       });
 
       if (transaction) {
+        // IDEMPOTENCY CHECK: Only process if not already completed
+        // This prevents duplicate wallet updates if Stripe sends the webhook multiple times
+        if (transaction.paymentStatus === 'COMPLETED') {
+          console.log(`[Webhook] Transaction ${transaction.id} already completed, skipping duplicate event ${event.id}`);
+          break;
+        }
+
+        // Update transaction status
         await prisma.transaction.update({
           where: { id: transaction.id },
           data: { paymentStatus: 'COMPLETED' },
         });
 
-        // Update user wallet
+        // Update user wallet (only happens once due to idempotency check above)
         await updateUserWallet(
           transaction.userId,
           Number(transaction.amount),
           Number(transaction.impactKg)
         );
+
+        console.log(`[Webhook] Processed payment for transaction ${transaction.id}, event ${event.id}`);
       }
       break;
     }

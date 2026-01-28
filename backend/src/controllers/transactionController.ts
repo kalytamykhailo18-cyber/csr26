@@ -18,6 +18,32 @@ export const createTransaction = asyncHandler(async (req: Request, res: Response
     throw badRequest('paymentMode is required');
   }
 
+  // Server-side gift code validation (CRITICAL: Don't trust frontend validation)
+  // Must validate BEFORE creating transaction to prevent invalid/used codes
+  if (giftCode && paymentMode === 'GIFT_CARD') {
+    const giftCodeRecord = await prisma.giftCode.findUnique({
+      where: { code: giftCode },
+      include: { sku: true },
+    });
+
+    if (!giftCodeRecord) {
+      throw badRequest('Gift code not found');
+    }
+
+    if (giftCodeRecord.status !== 'UNUSED') {
+      throw badRequest(
+        giftCodeRecord.status === 'USED'
+          ? 'Gift code has already been used'
+          : 'Gift code has been deactivated'
+      );
+    }
+
+    // Validate SKU match if skuCode provided
+    if (skuCode && giftCodeRecord.skuCode !== skuCode) {
+      throw badRequest('Gift code does not match this product');
+    }
+  }
+
   // Get or create user
   let userId = req.user?.id;
 
@@ -37,6 +63,42 @@ export const createTransaction = asyncHandler(async (req: Request, res: Response
     userId = user.id;
   }
 
+  // ============================================
+  // MULTIPLIER HIERARCHY (per requirements.md)
+  // Priority: Request → SKU → Merchant → Default Setting
+  // Valid values: 1, 2, 5, 10 only
+  // ============================================
+
+  // Get SKU and Merchant data for multiplier fallback
+  const skuData = skuCode ? await prisma.sku.findUnique({ where: { code: skuCode } }) : null;
+  const merchantData = merchantId ? await prisma.merchant.findUnique({ where: { id: merchantId } }) : null;
+
+  // Get default multiplier from settings
+  const defaultMultiplierSetting = await prisma.setting.findUnique({ where: { key: 'DEFAULT_MULTIPLIER' } });
+  const defaultMultiplier = defaultMultiplierSetting ? parseInt(defaultMultiplierSetting.value) : 1;
+
+  // Determine effective multiplier following hierarchy
+  let effectiveMultiplier: number;
+  if (multiplier && multiplier > 0) {
+    // 1. Request/Transaction level multiplier (highest priority)
+    effectiveMultiplier = multiplier;
+  } else if (skuData?.multiplier && skuData.multiplier > 0) {
+    // 2. SKU level multiplier
+    effectiveMultiplier = skuData.multiplier;
+  } else if (merchantData?.multiplier && merchantData.multiplier > 0) {
+    // 3. Merchant level multiplier
+    effectiveMultiplier = merchantData.multiplier;
+  } else {
+    // 4. Default setting (lowest priority)
+    effectiveMultiplier = defaultMultiplier;
+  }
+
+  // Validate multiplier is one of the allowed values (1, 2, 5, 10)
+  const allowedMultipliers = [1, 2, 5, 10];
+  if (!allowedMultipliers.includes(effectiveMultiplier)) {
+    throw badRequest(`Invalid multiplier value: ${effectiveMultiplier}. Allowed values are: ${allowedMultipliers.join(', ')}`);
+  }
+
   // Calculate impact
   // For weight-based products (CLAIM/ALLOCATION), calculate from weight
   // For amount-based (PAY/GIFT_CARD), calculate from amount
@@ -48,7 +110,6 @@ export const createTransaction = asyncHandler(async (req: Request, res: Response
     // Weight-based calculation (supermarket products, e-commerce dynamic weight)
     // Formula: Impact = Weight (kg) × Multiplier
     // Merchant cost = Weight (kg) × €0.11 × Multiplier
-    const effectiveMultiplier = multiplier && multiplier > 0 ? multiplier : 1;
     impact = await calculateWeightBasedImpact(weightGrams, effectiveMultiplier);
     // For weight-based, the calculated amount IS the merchant cost
     transactionAmount = impact.amount;
@@ -77,7 +138,7 @@ export const createTransaction = asyncHandler(async (req: Request, res: Response
       partnerId,
       giftCodeUsed: giftCode,
       weightGrams,
-      multiplier,
+      multiplier: effectiveMultiplier, // Store the actual multiplier used (after hierarchy resolution)
       // Maturation tracking (5/45/50 Rule)
       immediateImpactKg: maturation.immediateKg,
       midTermImpactKg: maturation.midTermKg,

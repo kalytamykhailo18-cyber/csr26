@@ -20,6 +20,8 @@ import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
 import DialogActions from '@mui/material/DialogActions';
+import UploadFileIcon from '@mui/icons-material/UploadFile';
+import { skuApi } from '../../api/apiClient';
 
 const emptySkuForm: Partial<Sku> = {
   code: '',
@@ -44,6 +46,9 @@ const SkuManager = () => {
   const [formData, setFormData] = useState<Partial<Sku>>(emptySkuForm);
   const [filter, setFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [importText, setImportText] = useState('');
+  const [importLoading, setImportLoading] = useState(false);
 
   // Fetch SKUs on mount
   useEffect(() => {
@@ -107,6 +112,58 @@ const SkuManager = () => {
     await dispatch(deleteSku(code));
   };
 
+  // Handle import from spreadsheet (CSV format)
+  const handleImport = async () => {
+    if (!importText.trim()) return;
+    setImportLoading(true);
+
+    try {
+      // Parse CSV: code,name,paymentMode,price,multiplier,weightGrams
+      const lines = importText.trim().split('\n');
+      const skusToCreate: Partial<Sku>[] = [];
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line || line.startsWith('code,')) continue; // Skip header or empty lines
+
+        const parts = line.split(',').map((p) => p.trim());
+        if (parts.length < 3) continue;
+
+        const [code, name, paymentMode, priceStr, multiplierStr, weightStr] = parts;
+        skusToCreate.push({
+          code,
+          name,
+          paymentMode: paymentMode as PaymentMode,
+          price: priceStr ? parseFloat(priceStr) : 0,
+          multiplier: multiplierStr ? parseInt(multiplierStr) : 1,
+          weightGrams: weightStr ? parseInt(weightStr) : undefined,
+          active: true,
+        });
+      }
+
+      // Create each SKU via API
+      let successCount = 0;
+      for (const skuData of skusToCreate) {
+        try {
+          await skuApi.create(skuData);
+          successCount++;
+        } catch (err) {
+          console.error(`Failed to create SKU ${skuData.code}:`, err);
+        }
+      }
+
+      setImportDialogOpen(false);
+      setImportText('');
+      dispatch(fetchAllSkus());
+      alert(`Successfully imported ${successCount} of ${skusToCreate.length} SKUs`);
+    } catch (err) {
+      console.error('Import failed:', err);
+      alert('Import failed: ' + (err as Error).message);
+    } finally {
+      setImportLoading(false);
+    }
+  };
+
   // Get payment mode badge color
   const getPaymentModeBadge = (mode: PaymentMode) => {
     const colors: Record<PaymentMode, string> = {
@@ -148,6 +205,14 @@ const SkuManager = () => {
             <MenuItem value="active">Active</MenuItem>
             <MenuItem value="inactive">Inactive</MenuItem>
           </Select>
+          <Button
+            variant="outlined"
+            startIcon={<UploadFileIcon />}
+            onClick={() => setImportDialogOpen(true)}
+            sx={{ textTransform: 'none' }}
+          >
+            Import CSV
+          </Button>
           <Button
             variant="contained"
             onClick={handleCreate}
@@ -373,6 +438,54 @@ const SkuManager = () => {
             sx={{ textTransform: 'none' }}
           >
             {editingSku ? 'Update' : 'Create'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Import Dialog */}
+      <Dialog
+        open={importDialogOpen}
+        onClose={() => setImportDialogOpen(false)}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>Import SKUs from CSV</DialogTitle>
+        <DialogContent>
+          <div className="space-y-4 pt-4">
+            <Alert severity="info">
+              Format: code,name,paymentMode,price,multiplier,weightGrams (one SKU per line)
+              <br />
+              Example: GC-50EUR,Gift Card 50,GIFT_CARD,50,1,
+            </Alert>
+            <TextField
+              label="CSV Data"
+              value={importText}
+              onChange={(e) => setImportText(e.target.value)}
+              fullWidth
+              multiline
+              rows={12}
+              placeholder="code,name,paymentMode,price,multiplier,weightGrams
+GC-50EUR,Gift Card 50,GIFT_CARD,50,1,
+LOT-PRODUCT-01,Product Lot,CLAIM,0,2,17"
+            />
+            <p className="text-sm text-gray-500">
+              {importText.trim()
+                ? `${importText.trim().split('\n').filter((l) => l.trim() && !l.startsWith('code,')).length} SKUs detected`
+                : 'Paste CSV data above'}
+            </p>
+          </div>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setImportDialogOpen(false)} sx={{ textTransform: 'none' }}>
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            onClick={handleImport}
+            disabled={importLoading || !importText.trim()}
+            sx={{ textTransform: 'none' }}
+          >
+            {importLoading ? <CircularProgress size={20} /> : 'Import'}
           </Button>
         </DialogActions>
       </Dialog>

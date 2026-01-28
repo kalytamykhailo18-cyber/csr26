@@ -1,5 +1,12 @@
 // CSR26 Partner Dashboard
 // Dashboard for partners to view their merchants, transactions, and impact
+//
+// ARCHITECTURE NOTE: This dashboard intentionally uses local state instead of Redux because:
+// 1. Partners have a separate authentication system (PARTNER_TOKEN_KEY vs TOKEN_KEY)
+// 2. Partner state is completely isolated from user state to prevent token conflicts
+// 3. This avoids cross-contamination between partner and user sessions
+// 4. The partnerApi uses a dedicated axios instance with partner-specific interceptors
+// See apiClient.ts for the dual-auth implementation.
 
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';

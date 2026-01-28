@@ -99,6 +99,10 @@ export const authApi = {
 
   getMe: () =>
     apiClient.get<ApiResponse<import('../types').User>>('/auth/me'),
+
+  // Admin login via secret code (from landing page)
+  adminLogin: (secretCode: string) =>
+    apiClient.post<ApiResponse<{ user: import('../types').User; token: string }>>('/auth/admin-login', { secretCode }),
 };
 
 // SKU endpoints
@@ -279,6 +283,9 @@ export const adminApi = {
 
   updateTransactionStatus: (id: string, paymentStatus: 'PENDING' | 'COMPLETED' | 'FAILED') =>
     apiClient.patch<ApiResponse<import('../types').Transaction>>(`/admin/transactions/${id}`, { paymentStatus }),
+
+  createManualTransaction: (data: { email: string; amount: number; paymentMode: string; reason: string }) =>
+    apiClient.post<ApiResponse<import('../types').Transaction>>('/admin/transactions/manual', data),
 
   // Admin access
   verifyAdminAccess: (code: string) =>
@@ -468,6 +475,39 @@ export const partnerApi = {
       byMerchant: Array<{ id: string; name: string; count: number; revenue: number; impactKg: number }>;
       byPaymentMode: Record<string, { count: number; revenue: number; impactKg: number }>;
     }>>('/partners/me/reports/summary', { params }),
+
+  // Admin endpoints (uses regular apiClient with admin auth)
+  getAll: () =>
+    apiClient.get<ApiResponse<Array<{
+      id: string;
+      name: string;
+      email: string;
+      contactPerson: string | null;
+      commissionRate: number;
+      active: boolean;
+      createdAt: string;
+      _count: { merchants: number };
+    }>>>('/partners'),
+
+  create: (data: { name: string; email: string; contactPerson?: string; commissionRate?: number }) =>
+    apiClient.post<ApiResponse<{
+      id: string;
+      name: string;
+      email: string;
+      contactPerson: string | null;
+      commissionRate: number;
+      active: boolean;
+    }>>('/partners', data),
+
+  update: (id: string, data: { name?: string; contactPerson?: string; commissionRate?: number; active?: boolean }) =>
+    apiClient.put<ApiResponse<{
+      id: string;
+      name: string;
+      email: string;
+      contactPerson: string | null;
+      commissionRate: number;
+      active: boolean;
+    }>>(`/partners/${id}`, data),
 };
 
 export default apiClient;

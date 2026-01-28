@@ -40,6 +40,16 @@ async function main() {
       value: '10',
       description: 'Minimum EUR for monthly billing charge',
     },
+    {
+      key: 'ADMIN_SECRET_CODE',
+      value: process.env.ADMIN_SECRET_CODE || 'CSR26-ADMIN-2026',
+      description: 'Secret code for admin login via landing page (CHANGE IN PRODUCTION)',
+    },
+    {
+      key: 'ADMIN_EMAIL',
+      value: process.env.ADMIN_EMAIL || 'admin@impactcsr26.it',
+      description: 'Admin user email address',
+    },
   ];
 
   for (const setting of settings) {

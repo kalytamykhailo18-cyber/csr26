@@ -25,6 +25,10 @@ import {
   runAllTasks,
   CronRunResult,
 } from '../services/cronService.js';
+import {
+  calculateMaturationBreakdown,
+  updateUserWallet,
+} from '../services/calculationService.js';
 import type { ApiResponse } from '../types/index.js';
 
 // ============================================
@@ -472,6 +476,71 @@ export const updateTransactionStatus = asyncHandler(async (req: Request, res: Re
   };
 
   res.json(response);
+});
+
+// POST /api/admin/transactions/manual - Create manual transaction for corrections
+export const createManualTransaction = asyncHandler(async (req: Request, res: Response, _next: NextFunction) => {
+  const { email, amount, paymentMode, reason } = req.body;
+
+  if (!email) throw badRequest('User email is required');
+  if (!amount || amount <= 0) throw badRequest('Valid amount is required');
+  if (!paymentMode) throw badRequest('Payment mode is required');
+  if (!reason || !reason.trim()) throw badRequest('Reason is required for audit trail');
+
+  const validModes = ['CLAIM', 'PAY', 'GIFT_CARD', 'ALLOCATION'];
+  if (!validModes.includes(paymentMode)) {
+    throw badRequest(`Invalid payment mode. Must be one of: ${validModes.join(', ')}`);
+  }
+
+  // Find or create user by email
+  let user = await prisma.user.findUnique({ where: { email } });
+  if (!user) {
+    user = await prisma.user.create({
+      data: { email },
+    });
+  }
+
+  // Calculate impact (€0.11 per kg)
+  const pricePerKgSetting = await prisma.setting.findUnique({ where: { key: 'PRICE_PER_KG' } });
+  const pricePerKg = pricePerKgSetting ? parseFloat(pricePerKgSetting.value) : 0.11;
+  const impactKg = amount / pricePerKg;
+  const transactionAmount = parseFloat(String(amount));
+
+  // Calculate maturation breakdown (5/45/50 Rule)
+  const maturation = calculateMaturationBreakdown(impactKg);
+
+  // Create transaction with admin note and maturation data
+  const transaction = await prisma.transaction.create({
+    data: {
+      userId: user.id,
+      amount: transactionAmount,
+      impactKg,
+      paymentMode,
+      paymentStatus: 'COMPLETED', // Manual transactions are pre-completed
+      // Store reason in masterId for audit trail
+      masterId: `MANUAL:${reason}`,
+      // Maturation tracking (5/45/50 Rule)
+      immediateImpactKg: maturation.immediateKg,
+      midTermImpactKg: maturation.midTermKg,
+      finalImpactKg: maturation.finalKg,
+      midTermMaturesAt: maturation.midTermMaturesAt,
+      finalMaturesAt: maturation.finalMaturesAt,
+    },
+    include: {
+      user: { select: { id: true, email: true } },
+    },
+  });
+
+  // Update user wallet with proper maturation tracking
+  // This also handles threshold check and Corsair export trigger
+  await updateUserWallet(user.id, transactionAmount, impactKg);
+
+  const response: ApiResponse<typeof transaction> = {
+    success: true,
+    data: transaction,
+  };
+
+  res.status(201).json(response);
 });
 
 // ============================================

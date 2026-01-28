@@ -81,6 +81,21 @@ export const getCurrentUser = createAsyncThunk(
   }
 );
 
+// Async thunk: Admin login via secret code (from landing page)
+export const adminLogin = createAsyncThunk(
+  'auth/adminLogin',
+  async (secretCode: string, { rejectWithValue }) => {
+    try {
+      const response = await authApi.adminLogin(secretCode);
+      const { user, token } = response.data.data;
+      setAuthToken(token);
+      return { user, token };
+    } catch (error) {
+      return rejectWithValue((error as Error).message);
+    }
+  }
+);
+
 const authSlice = createSlice({
   name: 'auth',
   initialState,
@@ -175,6 +190,23 @@ const authSlice = createSlice({
         state.user = null;
         state.token = null;
         state.isAuthenticated = false;
+        state.error = action.payload as string;
+      });
+
+    // Admin login
+    builder
+      .addCase(adminLogin.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(adminLogin.fulfilled, (state, action) => {
+        state.loading = false;
+        state.user = action.payload.user;
+        state.token = action.payload.token;
+        state.isAuthenticated = true;
+      })
+      .addCase(adminLogin.rejected, (state, action) => {
+        state.loading = false;
         state.error = action.payload as string;
       });
   },

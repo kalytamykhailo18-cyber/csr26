@@ -6,6 +6,22 @@ import { prisma } from '../lib/prisma.js';
 import type { Invoice, Merchant } from '@prisma/client';
 
 // ============================================
+// SETTING HELPERS
+// ============================================
+
+// Get setting value with default fallback
+const getSettingValue = async (key: string, defaultValue: string): Promise<string> => {
+  const setting = await prisma.setting.findUnique({ where: { key } });
+  return setting?.value ?? defaultValue;
+};
+
+// Get monthly billing minimum from settings (default €10)
+const getMonthlyBillingMinimum = async (): Promise<number> => {
+  const value = await getSettingValue('MONTHLY_BILLING_MINIMUM', '10');
+  return parseFloat(value);
+};
+
+// ============================================
 // TYPES
 // ============================================
 
@@ -73,6 +89,14 @@ export const generateMerchantInvoice = async (
   // If balance is 0, skip invoice generation
   if (currentBalance <= 0) {
     console.log(`[Billing] No balance for merchant: ${merchant.name}`);
+    return null;
+  }
+
+  // Check if balance meets minimum threshold for invoicing (default €10)
+  // This saves on payment processing fees by avoiding small invoices
+  const billingMinimum = await getMonthlyBillingMinimum();
+  if (currentBalance < billingMinimum) {
+    console.log(`[Billing] Balance €${currentBalance.toFixed(2)} below minimum €${billingMinimum} for merchant: ${merchant.name}. Carrying over to next month.`);
     return null;
   }
 

@@ -151,6 +151,30 @@ const GiftCodeManager = () => {
             <MenuItem value="DEACTIVATED">Deactivated</MenuItem>
           </Select>
           <Button
+            variant="outlined"
+            onClick={() => {
+              // Export unused codes to CSV
+              const unusedCodes = giftCodes.filter((gc) => gc.status === 'UNUSED');
+              if (unusedCodes.length === 0) {
+                alert('No unused codes to export');
+                return;
+              }
+              const csvContent = ['Code,SKU,Created']
+                .concat(unusedCodes.map((gc) => `${gc.code},${gc.skuCode},${new Date(gc.createdAt).toLocaleDateString()}`))
+                .join('\n');
+              const blob = new Blob([csvContent], { type: 'text/csv' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `unused-gift-codes-${new Date().toISOString().split('T')[0]}.csv`;
+              a.click();
+              URL.revokeObjectURL(url);
+            }}
+            sx={{ textTransform: 'none' }}
+          >
+            Export Unused
+          </Button>
+          <Button
             variant="contained"
             startIcon={<UploadFileIcon />}
             onClick={() => setUploadDialogOpen(true)}

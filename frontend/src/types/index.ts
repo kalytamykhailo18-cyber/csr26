@@ -121,6 +121,7 @@ export interface Merchant {
   lastBillingDate: string | null;
   stripeAccountId: string | null;
   partnerId: string | null;
+  active: boolean;          // Merchant active status
   createdAt: string;        // ISO date string
   updatedAt: string;        // ISO date string
 }
@@ -246,7 +247,8 @@ export interface LandingFormData {
 }
 
 // Determines which form to show based on case
-export type LandingCase = 'A' | 'B' | 'C' | 'D' | 'E' | 'F';
+// A-F: Customer journeys, ADMIN: Admin login via special SKU
+export type LandingCase = 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'ADMIN';
 
 export interface LandingPageState {
   case: LandingCase;

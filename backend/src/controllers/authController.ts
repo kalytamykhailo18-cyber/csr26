@@ -192,3 +192,72 @@ export const getCurrentUser = asyncHandler(async (req: Request, res: Response, _
 
   res.json(response);
 });
+
+// POST /api/auth/admin-login - Admin login via secret code (from landing page)
+// Requirements: Admin accesses via landing?sku=ADMIN-ACCESS-2026 with secret code validation
+export const adminLogin = asyncHandler(async (req: Request, res: Response, _next: NextFunction) => {
+  const { secretCode } = req.body;
+
+  if (!secretCode) {
+    throw badRequest('Secret code is required');
+  }
+
+  // Get admin secret code from settings
+  const adminSecretSetting = await prisma.setting.findUnique({
+    where: { key: 'ADMIN_SECRET_CODE' },
+  });
+
+  if (!adminSecretSetting) {
+    // If no admin secret is configured, deny access
+    throw badRequest('Admin access not configured');
+  }
+
+  // Validate secret code
+  if (secretCode !== adminSecretSetting.value) {
+    throw badRequest('Invalid secret code');
+  }
+
+  // Find or create admin user
+  // Use a specific admin email from settings or default
+  const adminEmailSetting = await prisma.setting.findUnique({
+    where: { key: 'ADMIN_EMAIL' },
+  });
+
+  const adminEmail = adminEmailSetting?.value || 'admin@csr26.it';
+
+  let adminUser = await prisma.user.findUnique({
+    where: { email: adminEmail },
+  });
+
+  if (!adminUser) {
+    // Create admin user
+    adminUser = await prisma.user.create({
+      data: {
+        email: adminEmail,
+        firstName: 'Admin',
+        lastName: 'User',
+        role: 'ADMIN',
+      },
+    });
+  } else if (adminUser.role !== 'ADMIN') {
+    // Upgrade user to admin if not already
+    adminUser = await prisma.user.update({
+      where: { id: adminUser.id },
+      data: { role: 'ADMIN' },
+    });
+  }
+
+  // Generate token
+  const token = generateToken({
+    userId: adminUser.id,
+    email: adminUser.email,
+    role: adminUser.role,
+  });
+
+  const response: ApiResponse<AuthResponse> = {
+    success: true,
+    data: { user: adminUser, token },
+  };
+
+  res.json(response);
+});

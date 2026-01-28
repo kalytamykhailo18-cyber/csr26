@@ -32,6 +32,7 @@ import GiftCardForm from './GiftCardForm';
 import AllocationView from './AllocationView';
 import GeneralForm from './GeneralForm';
 import ThankYouMessage from './ThankYouMessage';
+import AdminLoginForm from './AdminLoginForm';
 
 const LandingPage = () => {
   const dispatch = useAppDispatch();
@@ -287,6 +288,11 @@ const LandingPage = () => {
 
   // Render the appropriate form based on case
   const renderForm = () => {
+    // Case ADMIN: Admin login via secret code
+    if (landingCase === 'ADMIN') {
+      return <AdminLoginForm skuCode={params.sku || 'ADMIN'} />;
+    }
+
     // Show thank you message if submitted (check both state and ref)
     if (submitted || submittedRef.current) {
       return (
@@ -384,8 +390,8 @@ const LandingPage = () => {
       {/* Main Content */}
       <main className="flex-1 px-4 md:px-8 py-8">
         <div className="max-w-2xl mx-auto">
-          {/* Dynamic Message */}
-          {!submitted && (
+          {/* Dynamic Message - Hide for ADMIN case */}
+          {!submitted && landingCase !== 'ADMIN' && (
             <div className="text-center mb-8 animate-fade-right-normal">
               <h2 className="text-xl md:text-2xl font-semibold text-gray-800 mb-2">
                 {message.title}
@@ -394,8 +400,8 @@ const LandingPage = () => {
             </div>
           )}
 
-          {/* Protocol Block */}
-          <ProtocolBlock className="mb-8" />
+          {/* Protocol Block - Hide for ADMIN case */}
+          {landingCase !== 'ADMIN' && <ProtocolBlock className="mb-8" />}
 
           {/* Form or Loading */}
           {isLoading && !submitted ? (

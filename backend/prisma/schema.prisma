@@ -261,6 +261,9 @@ model Merchant {
   // Stripe Connect
   stripeAccountId   String?
 
+  // Status
+  active            Boolean     @default(true)
+
   // Attribution - linked to Partner
   partnerId         String?
 

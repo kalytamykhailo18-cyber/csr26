@@ -248,12 +248,21 @@ export const getMerchantBilling = asyncHandler(async (req: Request, res: Respons
   res.json(response);
 });
 
+// Allowed multiplier values per requirements.md
+const ALLOWED_MULTIPLIERS = [1, 2, 5, 10];
+
 // POST /api/merchants - Create new merchant (admin only)
 export const createMerchant = asyncHandler(async (req: Request, res: Response, _next: NextFunction) => {
   const { name, email, multiplier, pricePerKg, monthlyBilling, partnerId } = req.body;
 
   if (!name || !email) {
     throw badRequest('Name and email are required');
+  }
+
+  // Validate multiplier value if provided
+  const effectiveMultiplier = multiplier || 1;
+  if (!ALLOWED_MULTIPLIERS.includes(effectiveMultiplier)) {
+    throw badRequest(`Invalid multiplier value: ${effectiveMultiplier}. Allowed values are: ${ALLOWED_MULTIPLIERS.join(', ')}`);
   }
 
   // Check if email already exists
@@ -266,7 +275,7 @@ export const createMerchant = asyncHandler(async (req: Request, res: Response, _
     data: {
       name,
       email,
-      multiplier: multiplier || 1,
+      multiplier: effectiveMultiplier,
       pricePerKg,
       monthlyBilling: monthlyBilling !== false,
       partnerId,
@@ -286,6 +295,11 @@ export const updateMerchant = asyncHandler(async (req: Request, res: Response, _
   const id = req.params.id as string;
   if (!id) throw badRequest('Merchant ID is required');
   const updateData = req.body;
+
+  // Validate multiplier value if being updated
+  if (updateData.multiplier !== undefined && !ALLOWED_MULTIPLIERS.includes(updateData.multiplier)) {
+    throw badRequest(`Invalid multiplier value: ${updateData.multiplier}. Allowed values are: ${ALLOWED_MULTIPLIERS.join(', ')}`);
+  }
 
   const existing = await prisma.merchant.findUnique({ where: { id } });
   if (!existing) {

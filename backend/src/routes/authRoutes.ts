@@ -16,4 +16,7 @@ router.get('/verify/:token', authController.verifyMagicLink);
 // GET /api/auth/me - Get current user (requires auth)
 router.get('/me', authenticate, authController.getCurrentUser);
 
+// POST /api/auth/admin-login - Admin login via secret code (from landing page)
+router.post('/admin-login', authController.adminLogin);
+
 export default router;

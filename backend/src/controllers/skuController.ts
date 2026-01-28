@@ -3,6 +3,9 @@ import { asyncHandler, badRequest, notFound } from '../middleware/errorHandler.j
 import { prisma } from '../lib/prisma.js';
 import type { ApiResponse, Sku } from '../types/index.js';
 
+// Allowed multiplier values per requirements.md
+const ALLOWED_MULTIPLIERS = [1, 2, 5, 10];
+
 // GET /api/skus/:code - Get SKU by code (public)
 export const getSkuByCode = asyncHandler(async (req: Request, res: Response, _next: NextFunction) => {
   const code = req.params.code as string;
@@ -74,6 +77,12 @@ export const createSku = asyncHandler(async (req: Request, res: Response, _next:
     throw badRequest('Code, name, and paymentMode are required');
   }
 
+  // Validate multiplier value if provided
+  const effectiveMultiplier = multiplier || 1;
+  if (!ALLOWED_MULTIPLIERS.includes(effectiveMultiplier)) {
+    throw badRequest(`Invalid multiplier value: ${effectiveMultiplier}. Allowed values are: ${ALLOWED_MULTIPLIERS.join(', ')}`);
+  }
+
   // Check if code already exists
   const existing = await prisma.sku.findUnique({ where: { code } });
   if (existing) {
@@ -88,7 +97,7 @@ export const createSku = asyncHandler(async (req: Request, res: Response, _next:
       paymentMode,
       price: price || 0,
       weightGrams,
-      multiplier: multiplier || 1,
+      multiplier: effectiveMultiplier,
       paymentRequired: paymentRequired || false,
       validationRequired: validationRequired || false,
       merchantId,
@@ -126,6 +135,14 @@ export const updateSku = asyncHandler(async (req: Request, res: Response, _next:
     validationRequired,
     active,
   } = req.body;
+
+  // Validate multiplier value if being updated
+  if (multiplier !== undefined) {
+    const parsedMultiplier = parseInt(multiplier) || 1;
+    if (!ALLOWED_MULTIPLIERS.includes(parsedMultiplier)) {
+      throw badRequest(`Invalid multiplier value: ${parsedMultiplier}. Allowed values are: ${ALLOWED_MULTIPLIERS.join(', ')}`);
+    }
+  }
 
   const sku = await prisma.sku.update({
     where: { code },

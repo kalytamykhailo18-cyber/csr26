@@ -75,13 +75,19 @@ export const calculateWeightBasedImpact = (
 };
 
 /**
- * Determine the landing case (A-F) based on SKU and URL params
+ * Determine the landing case (A-F, ADMIN) based on SKU and URL params
  * See requirements.md for case definitions
  */
 export const determineLandingCase = (
   sku: Sku | null,
   params: LandingParams
 ): LandingCase => {
+  // Case ADMIN: Admin login via special SKU code (e.g., ADMIN-ACCESS-2026)
+  // Check URL param first before SKU lookup (SKU may not exist in database)
+  if (params.sku && params.sku.toUpperCase().startsWith('ADMIN-')) {
+    return 'ADMIN';
+  }
+
   // Case F: GENERAL - No SKU, direct marketing link
   if (!sku && !params.sku) {
     return 'F';

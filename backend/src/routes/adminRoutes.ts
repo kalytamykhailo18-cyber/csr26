@@ -46,6 +46,9 @@ router.get('/transactions', authenticate, adminOnly, adminController.getAllTrans
 // PATCH /api/admin/transactions/:id - Update transaction status
 router.patch('/transactions/:id', authenticate, adminOnly, adminController.updateTransactionStatus);
 
+// POST /api/admin/transactions/manual - Create manual transaction for corrections
+router.post('/transactions/manual', authenticate, adminOnly, adminController.createManualTransaction);
+
 // ============================================
 // ADMIN ACCESS (Special SKU Code)
 // ============================================
