@@ -33,6 +33,7 @@ const PaymentForm = ({ clientSecret, amount, transactionId, onSuccess, onError }
   const elements = useElements();
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [elementReady, setElementReady] = useState(false);
 
   const handleSubmit = async () => {
     if (!stripe || !elements) {
@@ -116,12 +117,21 @@ const PaymentForm = ({ clientSecret, amount, transactionId, onSuccess, onError }
         </Alert>
       )}
 
-      <div className="bg-gray-50 p-4 rounded-md border border-gray-200">
-        <PaymentElement
-          options={{
-            layout: 'tabs',
-          }}
-        />
+      <div className="bg-gray-50 p-4 rounded-md border border-gray-200 relative min-h-[200px]">
+        {!elementReady && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-50 z-10">
+            <CircularProgress size={32} />
+            <p className="mt-3 text-sm text-gray-500">Loading payment form...</p>
+          </div>
+        )}
+        <div className={elementReady ? 'opacity-100' : 'opacity-0'}>
+          <PaymentElement
+            onReady={() => setElementReady(true)}
+            options={{
+              layout: 'tabs',
+            }}
+          />
+        </div>
       </div>
 
       <Button
@@ -129,7 +139,7 @@ const PaymentForm = ({ clientSecret, amount, transactionId, onSuccess, onError }
         variant="contained"
         fullWidth
         size="large"
-        disabled={!stripe || !elements || processing}
+        disabled={!stripe || !elements || processing || !elementReady}
         sx={{
           py: 1.5,
           textTransform: 'none',
